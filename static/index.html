@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPECTRE_GRID // Next-Gen NGFW Radar</title>
+    <!-- Fontes Premium de Cibersegurança -->
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;600;800&family=Outfit:wght@400;600;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome para Ícones de Sistema -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="cyber-overlay"></div>
+    <div class="dashboard-container">
+        
+        <!-- HEADER CIBERNÉTICO DE OPERAÇÕES -->
+        <header class="cyber-header">
+            <div class="logo-area">
+                <div class="glitch-wrapper">
+                    <h1 class="glitch" data-text="SPECTRE_GRID">SPECTRE_GRID</h1>
+                </div>
+                <div class="status-badge">
+                    <span class="pulse-ring"></span>
+                    <span class="status-text">NGFW CORE v2.4 // ACTIVE</span>
+                </div>
+            </div>
+            
+            <div class="system-time-group">
+                <div class="stat-indicator">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>GPU: <span id="gpu-status">CUDA ACTIVE</span></span>
+                </div>
+                <div class="stat-indicator">
+                    <i class="fa-solid fa-network-wired"></i>
+                    <span>LATENCY: <span id="ping-status">0.42 ms</span></span>
+                </div>
+                <div class="clock-area" id="real-time-clock">--:--:--</div>
+            </div>
+        </header>
+
+        <!-- LAYOUT DE TRÊS COLUNAS ULTRA-PREMIUM -->
+        <div class="main-layout">
+            
+            <!-- COLUNA ESQUERDA: MÉTRICAS E RISCO -->
+            <aside class="left-column">
+                <!-- Painel de Risco -->
+                <section class="panel glass-panel threat-status-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-shield-halved text-cyan"></i>
+                        <h2>ESTADO DE AMEAÇA</h2>
+                        <span class="badge" id="risk-badge">SEGURO</span>
+                    </div>
+                    
+                    <div class="risk-gauge-container">
+                        <svg class="circular-gauge" viewBox="0 0 100 100">
+                            <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
+                            <circle class="gauge-fill" id="circular-risk-fill" cx="50" cy="50" r="40" stroke-dasharray="251.2" stroke-dashoffset="251.2"></circle>
+                        </svg>
+                        <div class="gauge-overlay">
+                            <span class="gauge-label">RISCO GERAL</span>
+                            <span class="gauge-value" id="live-risk-pct">0%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mini-stats-grid">
+                        <div class="mini-stat">
+                            <span class="label">ANOMALIA GNN</span>
+                            <span class="val text-amber" id="gnn-anomaly-val">0.02</span>
+                        </div>
+                        <div class="mini-stat">
+                            <span class="label">LATERAL RATIO</span>
+                            <span class="val text-red" id="lateral-ratio-val">0.00%</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Painel de Contadores -->
+                <section class="panel glass-panel counters-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-chart-simple text-cyan"></i>
+                        <h2>MÉTRICAS DE TRÁFEGO</h2>
+                    </div>
+                    
+                    <div class="counters-grid">
+                        <div class="counter-box">
+                            <div class="icon-wrap"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                            <div class="data">
+                                <span class="counter-title">FLUXOS ANALISADOS</span>
+                                <span class="counter-number text-cyan" id="total-flows">0</span>
+                            </div>
+                        </div>
+                        
+                        <div class="counter-box alarm">
+                            <div class="icon-wrap"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="data">
+                                <span class="counter-title">AMEAÇAS DETETADAS</span>
+                                <span class="counter-number text-red" id="total-threats">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Painel Histórico: Gráfico de Risco Sparkline -->
+                <section class="panel glass-panel history-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-wave-square text-cyan"></i>
+                        <h2>TIMELINE DE INTRUSÃO</h2>
+                    </div>
+                    <div class="sparkline-container">
+                        <canvas id="sparkline-canvas"></canvas>
+                    </div>
+                </section>
+            </aside>
+            
+            <!-- COLUNA CENTRAL: MAPA DE TOPOLOGIA DE GRAFO GNN (AESTHETIC WOW!) -->
+            <main class="center-column">
+                <section class="panel glass-panel graph-panel">
+                    <div class="panel-header">
+                        <div class="title-with-subtitle">
+                            <div class="flex-row">
+                                <i class="fa-solid fa-circle-nodes text-cyan pulse"></i>
+                                <h2>TOPOLOGIA DO GRAFO GEOMÉTRICO (STGNN)</h2>
+                            </div>
+                            <p class="subtitle">Análise Espacial de Fluxos em Tempo Real baseada em GATConv (Nós = IPs, Arestas = Conexões)</p>
+                        </div>
+                        <div class="graph-legend">
+                            <span class="legend-item"><span class="legend-dot normal"></span>Normal</span>
+                            <span class="legend-item"><span class="legend-dot critical animate-pulse-red"></span>Sob Ataque</span>
+                            <span class="legend-item"><span class="legend-dot server"></span>Servidor Crítico</span>
+                        </div>
+                    </div>
+                    
+                    <div class="canvas-wrapper">
+                        <!-- O GRANDE VISUALIZADOR DE GRAFOS GNN -->
+                        <canvas id="gnn-canvas"></canvas>
+                        
+                        <div class="canvas-controls">
+                            <button id="btn-reset-layout" title="Reset Layout"><i class="fa-solid fa-arrows-rotate"></i></button>
+                            <button id="btn-freeze-layout" title="Congelar Nós"><i class="fa-solid fa-lock"></i></button>
+                        </div>
+                        
+                        <!-- HUD do Visualizador de Nós -->
+                        <div class="node-hud" id="node-hud-panel">
+                            <div class="hud-header">
+                                <span class="hud-ip" id="hud-ip-val">IP: Selecione um nó</span>
+                                <button class="hud-close" id="btn-close-hud">&times;</button>
+                            </div>
+                            <div class="hud-body">
+                                <div class="hud-row"><span>Roteamento:</span> <span id="hud-role">N/A</span></div>
+                                <div class="hud-row"><span>Risco GNN:</span> <span id="hud-risk" class="text-green">0.00%</span></div>
+                                <div class="hud-row"><span>Conexões Ativas:</span> <span id="hud-degree">0</span></div>
+                                <div class="hud-row"><span>Volume:</span> <span id="hud-volume">0 KB</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+            
+            <!-- COLUNA DIREITA: CONSOLE DE ALERTAS E INSPEÇÃO -->
+            <aside class="right-column">
+                <!-- Painel de Inspeção de Fluxo -->
+                <section class="panel glass-panel inspector-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-magnifying-glass-chart text-cyan"></i>
+                        <h2>INSPETOR DE DETECÇÕES</h2>
+                    </div>
+                    
+                    <div class="inspector-box" id="flow-inspector">
+                        <div class="no-selection-msg">
+                            <i class="fa-solid fa-satellite-dish fa-spin-slow"></i>
+                            <p>A aguardar anomalias ou seleção de fluxo no terminal...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Console de Logs em Tempo Real -->
+                <section class="panel glass-panel terminal-panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-terminal text-cyan"></i>
+                        <h2>CONEXÕES DE REDE DETETADAS</h2>
+                        <div class="terminal-actions">
+                            <span class="glow-indicator" id="term-status-glow"></span>
+                            <span class="status-name" id="term-status-name">LISTEN</span>
+                        </div>
+                    </div>
+                    
+                    <div class="terminal-window" id="terminal-log">
+                        <div class="log-entry system-msg">
+                            <span class="timestamp">[SYSTEM]</span> 
+                            <span>Estabelecendo conexão segura com a API SPECTRE_GRID...</span>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+            
+        </div>
+    </div>
+
+    <!-- Scripts do Dashboard -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

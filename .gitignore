@@ -1,0 +1,46 @@
+# ============================================================
+# SPECTRE_GRID — .gitignore
+# ============================================================
+
+# === Ambientes Python ===
+.venv*/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+*.egg
+
+# === Build / Compilação C++ ===
+build/
+*.o
+*.so
+*.a
+CMakeCache.txt
+CMakeFiles/
+
+# === Modelos Treinados (grandes, versionados separadamente) ===
+*.pt
+*.pth
+!data/processed/top20_features.json
+
+# === Temporários do Sistema ===
+.tmp.drivedownload/
+.tmp.driveupload/
+*.deb
+
+# === IDE / Editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Releases empacotados ===
+*.zip
+
+# === Logs & Outputs ===
+*.log
+data/processed/confusion_matrix.png
