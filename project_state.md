@@ -22,7 +22,7 @@ Sistema de Detecção de Intrusão (IDS) Híbrido focado em ameaças avançadas 
 
 ## Codename e Regras Operacionais
 - **Codename do modelo:** `SPECTRE_GRID`
-- **Compatibilidade:** `Super_IDS_Net` permanece como alias interno para integração legada.
+- **Compatibilidade:** Nome canónico consolidado como `SPECTRE_GRID` em toda a base de código.
 - **Operação de alteração:** `model.py` e `train.py` só devem ser modificados com aprovação explícita do usuário.
 - **Validação:** Toda mudança no motor nativo deve ser documentada em `cross_validation_report.md`.
 

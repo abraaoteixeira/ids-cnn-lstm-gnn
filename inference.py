@@ -70,7 +70,7 @@ def format_alerts_by_ip(probs: torch.Tensor, idx2ip: dict):
     Exibe alertas de cibersegurança com IPs reais da topologia de rede.
     """
     print("\n" + "=" * 70)
-    print("  ALERTAS DE CIBERSEGURANÇA — SPECTRE_GRID (DADOS REAIS)")
+    print("  ALERTAS DE CIBERSEGURANÇA - SPECTRE_GRID (DADOS REAIS)")
     print("=" * 70)
 
     # Separar ameaças e tráfego normal
@@ -79,7 +79,7 @@ def format_alerts_by_ip(probs: torch.Tensor, idx2ip: dict):
 
     for i, p in enumerate(probs):
         prob_pct = float(p.item() * 100)
-        ip_label = str(idx2ip.get(i, f"Nó {i}"))
+        ip_label = str(idx2ip.get(i, f"No {i}"))
         if prob_pct > 70:
             threats.append((ip_label, prob_pct))
         else:
@@ -87,30 +87,30 @@ def format_alerts_by_ip(probs: torch.Tensor, idx2ip: dict):
 
     # Exibir ameaças primeiro (vermelho)
     if threats:
-        print(f"\n  🛑 AMEAÇAS DETETADAS: {len(threats)}")
+        print(f"\n  [ALERT] AMEASAS DETETADAS: {len(threats)}")
         print("  " + "-" * 66)
         for ip, prob in sorted(threats, key=lambda x: x[1], reverse=True):
             color = "\033[91m"  # vermelho
             reset = "\033[0m"
-            severity = "CRÍTICO" if prob > 90 else "ALTO" if prob > 80 else "MÉDIO"
-            print(f"  {color}[{severity:>7}] {ip:<40} → {prob:6.2f}%{reset}")
+            severity = "CRITICO" if prob > 90 else "ALTO" if prob > 80 else "MEDIO"
+            print(f"  {color}[{severity:>7}] {ip:<40} -> {prob:6.2f}%{reset}")
 
     # Resumo do tráfego normal
     if normals:
-        print(f"\n  ✅ TRÁFEGO NORMAL: {len(normals)} nós")
+        print(f"\n  [OK] TRAFEGO NORMAL: {len(normals)} nos")
         print("  " + "-" * 66)
         # Mostrar apenas os top-5 com maior probabilidade
         top_normals = sorted(normals, key=lambda x: x[1], reverse=True)[:5]
         for ip, prob in top_normals:
             color = "\033[94m"  # azul
             reset = "\033[0m"
-            print(f"  {color}[   INFO] {ip:<40} → {prob:6.2f}%{reset}")
+            print(f"  {color}[   INFO] {ip:<40} -> {prob:6.2f}%{reset}")
         if len(normals) > 5:
-            print(f"  \033[90m  ... e mais {len(normals) - 5} nós com risco baixo\033[0m")
+            print(f"  \033[90m  ... e mais {len(normals) - 5} nos com risco baixo\033[0m")
 
     print("\n" + "=" * 70)
-    print(f"  RESUMO: {len(probs)} nós analisados | "
-          f"{len(threats)} ameaças | {len(normals)} normais")
+    print(f"  RESUMO: {len(probs)} nos analisados | "
+          f"{len(threats)} ameasas | {len(normals)} normais")
     print("=" * 70 + "\n")
 
 
@@ -131,27 +131,70 @@ def format_alerts_mock(probs: torch.Tensor):
 
 
 def run_inference_real(csv_path: str, model_path: str, features_path: Optional[str],
-                       device: torch.device, seq_len: int = 10, target_col: str = 'target'):
+                       device: torch.device, seq_len: int = 10, target_col: str = 'target',
+                       nrows: Optional[int] = None):
     """
-    Inferência com dados reais: lê CSV → preprocessor → grafo PyG → modelo → alertas por IP.
+    Inferência com dados reais: lê CSV/ZIP → preprocessor → grafo PyG → modelo → alertas por IP.
     """
+    import zipfile
     from preprocessor import one_hot_encode, select_topk_pearson, build_graph
 
     logger.info(f"Carregando dataset real: {csv_path}")
-    df = pd.read_csv(csv_path)
-    logger.info(f"Dataset carregado: {len(df)} linhas × {len(df.columns)} colunas")
+    
+    # Detecção se o arquivo é um ZIP (independentemente da extensão ser .zip ou .csv)
+    if zipfile.is_zipfile(csv_path):
+        logger.info(f"Detectado formato compactado ZIP. Lendo diretamente da memória RAM...")
+        with zipfile.ZipFile(csv_path) as z:
+            names = z.namelist()
+            # Prioriza arquivos conhecidos como válidos no zip de teste, senão tenta o primeiro
+            priorities = ['Tuesday-WorkingHours.pcap_ISCX.csv', 'Wednesday-workingHours.pcap_ISCX.csv']
+            chosen_file = None
+            for p in priorities:
+                if p in names:
+                    chosen_file = p
+                    break
+            if not chosen_file:
+                # Fallback: tentar o primeiro arquivo .csv no ZIP que abra com sucesso
+                for name in names:
+                    if name.endswith('.csv'):
+                        try:
+                            with z.open(name) as test_f:
+                                test_f.read(10)
+                            chosen_file = name
+                            break
+                        except Exception:
+                            continue
+            
+            if not chosen_file:
+                raise RuntimeError("Nenhum arquivo CSV válido pôde ser lido dentro do ZIP.")
+                
+            logger.info(f"Lendo sub-arquivo de tráfego: '{chosen_file}'")
+            with z.open(chosen_file) as f:
+                df = pd.read_csv(f, nrows=nrows)
+    else:
+        df = pd.read_csv(csv_path, nrows=nrows)
+        
+    logger.info(f"Dataset carregado com sucesso: {len(df)} linhas × {len(df.columns)} colunas")
 
-    # Detectar coluna target (compatibilidade NSL-KDD: 'class' ou 'target')
-    if target_col not in df.columns:
-        if 'class' in df.columns:
-            df['target'] = df['class']
-            logger.info("Coluna 'class' mapeada para 'target'.")
-        elif 'label' in df.columns:
-            df['target'] = df['label']
-            logger.info("Coluna 'label' mapeada para 'target'.")
-        else:
-            logger.warning("Nenhuma coluna target encontrada. Usando target=0 para todos os nós.")
-            df['target'] = 0
+    # Limpar espaços em branco dos nomes das colunas (crucial para CIC-IDS2017)
+    df.columns = df.columns.str.strip()
+
+    # Detectar coluna target de forma tolerante (case-insensitive e substrings)
+    target_found = False
+    for col in df.columns:
+        col_lower = col.lower()
+        if col_lower == 'target':
+            target_found = True
+            break
+        elif col_lower in ['class', 'label', 'class/label', 'target_class']:
+            df['target'] = df[col]
+            logger.info(f"Coluna de rótulo '{col}' mapeada para a coluna 'target'.")
+            target_found = True
+            break
+            
+    if not target_found:
+        logger.warning("Nenhuma coluna target ou label identificada. Criando target=0 padrão.")
+        df['target'] = 0
 
     # One-Hot Encoding
     df_enc = one_hot_encode(df, ['protocol_type', 'service', 'flag'])
@@ -222,7 +265,7 @@ def run_inference_mock(model_path: str, device: torch.device):
 
 
 def run_inference(csv_path: Optional[str], model_path: str, features_path: Optional[str],
-                  device_str: str = None):
+                  device_str: str = None, nrows: Optional[int] = None):
     """
     Ponto de entrada principal. Delega para inferência real ou mock conforme os argumentos.
     """
@@ -231,7 +274,7 @@ def run_inference(csv_path: Optional[str], model_path: str, features_path: Optio
 
     if csv_path:
         logger.info("Modo: INFERÊNCIA COM DADOS REAIS")
-        return run_inference_real(csv_path, model_path, features_path, device)
+        return run_inference_real(csv_path, model_path, features_path, device, nrows=nrows)
     else:
         logger.info("Modo: DRY-RUN (dados mock)")
         return run_inference_mock(model_path, device)
@@ -249,13 +292,15 @@ def parse_args():
                    help='JSON com top features (ex: data/processed/top20_features.json). Se omitido, recalcula.')
     p.add_argument('--device', dest='device', required=False,
                    help='cuda|cpu (auto-detecta se omitido)')
+    p.add_argument('--nrows', dest='nrows', type=int, required=False,
+                   help='Número de linhas para carregar (ex: 5000) para testes rápidos.')
     return p.parse_args()
 
 
 if __name__ == '__main__':
     args = parse_args()
     try:
-        run_inference(args.csv_path, args.model_path, args.features_path, args.device)
+        run_inference(args.csv_path, args.model_path, args.features_path, args.device, nrows=args.nrows)
     except Exception as e:
         logger.error(f"Erro na inferência: {e}")
         import traceback

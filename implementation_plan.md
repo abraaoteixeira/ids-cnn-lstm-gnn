@@ -5,7 +5,7 @@ Estabilizar o código raiz do projeto, alinhar o nome do modelo ao codinome ofic
 
 ## O que foi feito
 1. Renomeado o modelo Python em `model.py` para `SPECTRE_GRID`.
-2. Mantido `Super_IDS_Net` como alias de compatibilidade legada.
+2. Consolidado nome canónico `SPECTRE_GRID` em toda a base de código.
 3. Atualizado `train.py` para importar e instanciar `SPECTRE_GRID` corretamente.
 4. Adicionado `README.md` com instruções de uso, treino e build C++.
 5. Criado `validate_parity.py` para comparar a saída Python com o modelo TorchScript.

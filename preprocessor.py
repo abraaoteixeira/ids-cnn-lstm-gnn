@@ -104,8 +104,8 @@ def build_graph(
 
     logging.info(f'Usando src_col={src_col} dst_col={dst_col}')
 
-    # Prepare features: extract top_features
-    feat_df = df[top_features].fillna(0).copy()
+    # Prepare features: extract top_features, clean NaNs/infinites, and convert to float32
+    feat_df = df[top_features].replace([np.inf, -np.inf], np.nan).fillna(0).astype(np.float32)
 
     # Optionally standardize features across all node-time observations
     scaler = StandardScaler()
