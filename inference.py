@@ -134,46 +134,12 @@ def run_inference_real(csv_path: str, model_path: str, features_path: Optional[s
                        device: torch.device, seq_len: int = 10, target_col: str = 'target',
                        nrows: Optional[int] = None):
     """
-    Inferência com dados reais: lê CSV/ZIP → preprocessor → grafo PyG → modelo → alertas por IP.
+    Inferência com dados reais: lê CSV do disco -> preprocessor -> grafo PyG -> modelo -> alertas por IP.
     """
-    import zipfile
     from preprocessor import one_hot_encode, select_topk_pearson, build_graph
 
-    logger.info(f"Carregando dataset real: {csv_path}")
-    
-    # Detecção se o arquivo é um ZIP (independentemente da extensão ser .zip ou .csv)
-    if zipfile.is_zipfile(csv_path):
-        logger.info(f"Detectado formato compactado ZIP. Lendo diretamente da memória RAM...")
-        with zipfile.ZipFile(csv_path) as z:
-            names = z.namelist()
-            # Prioriza arquivos conhecidos como válidos no zip de teste, senão tenta o primeiro
-            priorities = ['Tuesday-WorkingHours.pcap_ISCX.csv', 'Wednesday-workingHours.pcap_ISCX.csv']
-            chosen_file = None
-            for p in priorities:
-                if p in names:
-                    chosen_file = p
-                    break
-            if not chosen_file:
-                # Fallback: tentar o primeiro arquivo .csv no ZIP que abra com sucesso
-                for name in names:
-                    if name.endswith('.csv'):
-                        try:
-                            with z.open(name) as test_f:
-                                test_f.read(10)
-                            chosen_file = name
-                            break
-                        except Exception:
-                            continue
-            
-            if not chosen_file:
-                raise RuntimeError("Nenhum arquivo CSV válido pôde ser lido dentro do ZIP.")
-                
-            logger.info(f"Lendo sub-arquivo de tráfego: '{chosen_file}'")
-            with z.open(chosen_file) as f:
-                df = pd.read_csv(f, nrows=nrows)
-    else:
-        df = pd.read_csv(csv_path, nrows=nrows)
-        
+    logger.info(f"Carregando dataset real do disco: {csv_path}")
+    df = pd.read_csv(csv_path, nrows=nrows)
     logger.info(f"Dataset carregado com sucesso: {len(df)} linhas × {len(df.columns)} colunas")
 
     # Limpar espaços em branco dos nomes das colunas (crucial para CIC-IDS2017)
