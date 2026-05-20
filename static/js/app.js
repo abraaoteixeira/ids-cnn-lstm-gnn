@@ -2,6 +2,16 @@
 // SPECTRE_GRID DIGITAL RADAR CONTROLLER
 // ==========================================================================
 
+// Cores para renderização do Canvas GNN (compatível com todos os browsers)
+const colors = {
+    cyan: '#00f3ff',
+    red: '#ff0055',
+    amber: '#ffb700',
+    green: '#10b981',
+    purple: '#9d4edd',
+    textMuted: '#94a3b8'
+};
+
 // Elementos de UI
 const totalFlowsEl = document.getElementById('total-flows');
 const totalThreatsEl = document.getElementById('total-threats');
@@ -267,22 +277,22 @@ function drawGNNGraph() {
         let grad = ctx.createRadialGradient(node.x, node.y, 2, node.x, node.y, node.radius);
         if (node.threatActive) {
             grad.addColorStop(0, '#ff4d6d');
-            grad.addColorStop(1, 'var(--neon-red)');
+            grad.addColorStop(1, colors.red);
             ctx.fillStyle = grad;
             ctx.shadowBlur = 15;
-            ctx.shadowColor = 'var(--neon-red)';
+            ctx.shadowColor = colors.red;
         } else if (node.isServer) {
             grad.addColorStop(0, '#c77dff');
-            grad.addColorStop(1, 'var(--neon-purple)');
+            grad.addColorStop(1, colors.purple);
             ctx.fillStyle = grad;
             ctx.shadowBlur = 10;
-            ctx.shadowColor = 'var(--neon-purple)';
+            ctx.shadowColor = colors.purple;
         } else {
             grad.addColorStop(0, '#a0f6ff');
-            grad.addColorStop(1, 'var(--neon-cyan)');
+            grad.addColorStop(1, colors.cyan);
             ctx.fillStyle = grad;
             ctx.shadowBlur = selectedNode === node ? 14 : 0;
-            ctx.shadowColor = 'var(--neon-cyan)';
+            ctx.shadowColor = colors.cyan;
         }
         ctx.fill();
         ctx.shadowBlur = 0; // Desativar sombra para o texto
@@ -291,14 +301,14 @@ function drawGNNGraph() {
         if (selectedNode === node) {
             ctx.beginPath();
             ctx.arc(node.x, node.y, node.radius + 5, 0, Math.PI * 2);
-            ctx.strokeStyle = 'var(--neon-cyan)';
+            ctx.strokeStyle = colors.cyan;
             ctx.lineWidth = 1.5;
             ctx.stroke();
         }
 
         // Texto com o IP do Nó
         ctx.font = '10px "Share Tech Mono"';
-        ctx.fillStyle = node.threatActive ? '#ffa6c9' : 'var(--text-muted)';
+        ctx.fillStyle = node.threatActive ? '#ffa6c9' : colors.textMuted;
         ctx.textAlign = 'center';
         ctx.fillText(node.ip.split(' ')[0], node.x, node.y - node.radius - 6);
     });
@@ -438,7 +448,7 @@ function drawSparkline() {
 
     // Contorno da linha principal
     sCtx.lineWidth = 2;
-    sCtx.strokeStyle = Math.max(...riskTimeline) > 75 ? 'var(--neon-red)' : 'var(--neon-cyan)';
+    sCtx.strokeStyle = Math.max(...riskTimeline) > 75 ? colors.red : colors.cyan;
     sCtx.stroke();
 }
 
