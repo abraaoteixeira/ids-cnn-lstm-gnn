@@ -78,9 +78,9 @@ resizeCanvas();
 class GNNNode {
     constructor(ip, isServer = false) {
         this.ip = ip;
-        // Posição inicial no centro com pequeno ruído
-        this.x = width / 2 + (Math.random() - 0.5) * 100;
-        this.y = height / 2 + (Math.random() - 0.5) * 100;
+        // Posição inicial espalhada aleatoriamente pela tela
+        this.x = Math.random() * (width - 160) + 80;
+        this.y = Math.random() * (height - 160) + 80;
         this.vx = 0;
         this.vy = 0;
         this.radius = isServer ? 16 : 10;
@@ -174,9 +174,9 @@ servers.forEach(srv => {
 // Algoritmo de Física: Repulsão, Atração e Gravidade Central
 function applyPhysics() {
     const nodeList = Array.from(nodes.values());
-    const kRepulsion = 1200; // Força de afastamento entre IPs
-    const kAttraction = 0.015; // Força de atração elástica dos links
-    const centerGravity = 0.005; // Força para puxar tudo de volta ao centro
+    const kRepulsion = 12000; // Força de afastamento entre IPs
+    const kAttraction = 0.008; // Força de atração elástica dos links
+    const centerGravity = 0.002; // Força para puxar tudo de volta ao centro
 
     // 1. Repulsão entre todos os nós (N^2 mas rápido para < 50 nós)
     for (let i = 0; i < nodeList.length; i++) {
@@ -187,7 +187,7 @@ function applyPhysics() {
             const dy = nB.y - nA.y;
             const dist = Math.sqrt(dx * dx + dy * dy) || 1;
             
-            if (dist < 280) {
+            if (dist < 400) { // Aumentado o raio de repulsão de 280 para 400
                 const force = kRepulsion / (dist * dist);
                 const fx = (dx / dist) * force;
                 const fy = (dy / dist) * force;
