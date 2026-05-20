@@ -27,6 +27,13 @@
 #include <dlfcn.h>
 
 #include <linux/if_link.h>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <ifaddrs.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <ctime>
 #include "common.h"
 
 // =====================================================================
@@ -239,6 +246,55 @@ static uint64_t clock_ns() {
     return static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL + ts.tv_nsec;
 }
 
+static std::string g_local_ip = "127.0.0.1";
+
+static std::string get_interface_ip(const char* iface_name) {
+    struct ifaddrs *ifaddr, *ifa;
+    std::string ip = "127.0.0.1";
+    if (getifaddrs(&ifaddr) == -1) return ip;
+
+    for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr) continue;
+        if (ifa->ifa_addr->sa_family == AF_INET && std::strcmp(ifa->ifa_name, iface_name) == 0) {
+            char host[NI_MAXHOST];
+            int s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+            if (s == 0) {
+                ip = host;
+                break;
+            }
+        }
+    }
+    freeifaddrs(ifaddr);
+    return ip;
+}
+
+static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, uint64_t packets, const std::string& log_path = "data/logs/spectre_alerts.jsonl") {
+    std::ofstream log_file(log_path, std::ios_base::app);
+    if (!log_file.is_open()) return;
+
+    std::time_t t = std::time(nullptr);
+    std::tm tm = *std::localtime(&t);
+    std::ostringstream ts;
+    ts << std::put_time(&tm, "%H:%M:%S");
+
+    struct in_addr src_addr;
+    src_addr.s_addr = src_ip;
+    std::string src_str = inet_ntoa(src_addr);
+    
+    bool is_threat = prob > DROP_THRESH;
+
+    log_file << "{\"flow_id\": " << (std::rand() % 10000)
+             << ", \"src_ip\": \"" << src_str << (is_threat ? " (ALVO SUSPEITO)" : "") << "\""
+             << ", \"dst_ip\": \"" << g_local_ip << " (WSL / TEU IP)\""
+             << ", \"port\": 80"
+             << ", \"protocol\": \"TCP\""
+             << ", \"probability\": " << std::fixed << std::setprecision(2) << (prob * 100.0f)
+             << ", \"is_threat\": " << (is_threat ? "true" : "false")
+             << ", \"bytes\": " << bytes
+             << ", \"packets\": " << packets
+             << ", \"timestamp\": \"" << ts.str() << "\"}\n";
+}
+
 // =====================================================================
 // MAIN
 // =====================================================================
@@ -254,6 +310,8 @@ int main(int argc, char **argv) {
         std::cerr << "Erro: Interface " << iface << " nao encontrada." << std::endl;
         return 1;
     }
+
+    g_local_ip = get_interface_ip(iface);
 
     // --- EXTENSOES DE GRAFO (GNN) ---
     std::cout << "[INFO] Carregando libpython3.12.so..." << std::endl;
@@ -402,6 +460,8 @@ int main(int argc, char **argv) {
                 ctx.current_index = (ctx.current_index + 1) % SEQ_LEN;
                 ctx.packet_count++;
 
+                float prob = 0.0f;
+
                 // =========================================================
                 // PASSO 3: INFERÊNCIA CONDICIONAL (SÓ SE packet_count >= 10)
                 // =========================================================
@@ -416,7 +476,7 @@ int main(int argc, char **argv) {
                         inputs.push_back(edge_tensor);
                         torch::Tensor output = module.forward(inputs).toTensor();
 
-                        float prob = torch::sigmoid(output).item<float>();
+                        prob = torch::sigmoid(output).item<float>();
                         total_inferences++;
                         inferences_run++;
 
@@ -438,6 +498,9 @@ int main(int argc, char **argv) {
                         std::cerr << "[ERRO] forward() falhou: " << e.what() << std::endl;
                     }
                 }
+
+                // Gravar fluxo/alerta no log em tempo real para o Dashboard
+                write_cpp_alert_to_log(src_ip, prob, metrics.bytes, metrics.packets);
             }
             key = next_key;
         }

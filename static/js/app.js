@@ -447,8 +447,8 @@ function drawSparkline() {
 // 3. WEBSOCKET - INGESTÃO DE FLUXOS E MODELO PYTORCH
 // ==========================================================================
 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const wsHost = window.location.hostname === 'localhost' ? '127.0.0.1' : window.location.hostname;
-const wsUrl = `${protocol}//${wsHost}:${window.location.port}/ws/threats`;
+const host = window.location.host || '127.0.0.1:8000';
+const wsUrl = `${protocol}//${host}/ws/threats`;
 let socket;
 
 function connectWebSocket() {
