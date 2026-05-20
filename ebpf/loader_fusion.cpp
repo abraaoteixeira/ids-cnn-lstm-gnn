@@ -32,6 +32,7 @@
 #include <sstream>
 #include <ifaddrs.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <netdb.h>
 #include <ctime>
 #include "common.h"
@@ -268,9 +269,24 @@ static std::string get_interface_ip(const char* iface_name) {
     return ip;
 }
 
-static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, uint64_t packets, const std::string& log_path = "data/logs/spectre_alerts.jsonl") {
-    std::ofstream log_file(log_path, std::ios_base::app);
-    if (!log_file.is_open()) return;
+static int g_ipc_fd = -1;
+
+static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, uint64_t packets, const std::string& = "") {
+    if (g_ipc_fd < 0) {
+        g_ipc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (g_ipc_fd >= 0) {
+            struct sockaddr_un addr;
+            std::memset(&addr, 0, sizeof(addr));
+            addr.sun_family = AF_UNIX;
+            std::strncpy(addr.sun_path, "/tmp/spectre.sock", sizeof(addr.sun_path) - 1);
+            if (connect(g_ipc_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+                close(g_ipc_fd);
+                g_ipc_fd = -1;
+            }
+        }
+    }
+
+    if (g_ipc_fd < 0) return; // Nao conectado (ex: Dashboard offline)
 
     std::time_t t = std::time(nullptr);
     std::tm tm = *std::localtime(&t);
@@ -283,16 +299,24 @@ static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, 
     
     bool is_threat = prob > DROP_THRESH;
 
-    log_file << "{\"flow_id\": " << (std::rand() % 10000)
-             << ", \"src_ip\": \"" << src_str << (is_threat ? " (ALVO SUSPEITO)" : "") << "\""
-             << ", \"dst_ip\": \"" << g_local_ip << " (WSL / TEU IP)\""
-             << ", \"port\": 80"
-             << ", \"protocol\": \"TCP\""
-             << ", \"probability\": " << std::fixed << std::setprecision(2) << (prob * 100.0f)
-             << ", \"is_threat\": " << (is_threat ? "true" : "false")
-             << ", \"bytes\": " << bytes
-             << ", \"packets\": " << packets
-             << ", \"timestamp\": \"" << ts.str() << "\"}\n";
+    std::ostringstream ss;
+    ss << "{\"flow_id\": " << (std::rand() % 10000)
+       << ", \"src_ip\": \"" << src_str << (is_threat ? " (ALVO SUSPEITO)" : "") << "\""
+       << ", \"dst_ip\": \"" << g_local_ip << " (WSL / TEU IP)\""
+       << ", \"port\": 80"
+       << ", \"protocol\": \"TCP\""
+       << ", \"probability\": " << std::fixed << std::setprecision(2) << (prob * 100.0f)
+       << ", \"is_threat\": " << (is_threat ? "true" : "false")
+       << ", \"bytes\": " << bytes
+       << ", \"packets\": " << packets
+       << ", \"timestamp\": \"" << ts.str() << "\"}\n";
+
+    std::string payload = ss.str();
+    ssize_t sent = send(g_ipc_fd, payload.c_str(), payload.length(), MSG_NOSIGNAL);
+    if (sent < 0) {
+        close(g_ipc_fd);
+        g_ipc_fd = -1;
+    }
 }
 
 // =====================================================================
@@ -396,6 +420,7 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, sig_handler);
     signal(SIGTERM, sig_handler);
+    signal(SIGPIPE, SIG_IGN);
 
     // =====================================================================
     // PASSO 2: MAPA DE RASTREAMENTO — INDEXADO POR IP DE ORIGEM
