@@ -174,14 +174,22 @@
                     </div>
                 </section>
 
-                <!-- Console de Logs em Tempo Real -->
+                <!-- Console de Logs em Tempo Real e Histórico -->
                 <section class="panel glass-panel terminal-panel">
-                    <div class="panel-header">
-                        <i class="fa-solid fa-terminal text-cyan"></i>
-                        <h2>CONEXÕES DE REDE DETETADAS</h2>
-                        <div class="terminal-actions">
+                    <div class="panel-header" style="justify-content: space-between; margin-bottom: 12px;">
+                        <div class="panel-tabs" style="display: flex; gap: 16px; align-items: center;">
+                            <h2 id="tab-live" class="active-tab" style="cursor: pointer; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-terminal text-cyan"></i> LIVE LOGS</h2>
+                            <h2 id="tab-history" class="inactive-tab" style="cursor: pointer; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-database"></i> SQLite HISTÓRICO</h2>
+                        </div>
+                        <div class="terminal-actions" id="live-actions">
                             <span class="glow-indicator" id="term-status-glow"></span>
                             <span class="status-name" id="term-status-name">LISTEN</span>
+                        </div>
+                        <div class="terminal-actions" id="history-actions" style="display: none; gap: 12px; align-items: center;">
+                            <label style="font-family: var(--font-ui); font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                                <input type="checkbox" id="chk-only-threats" style="cursor: pointer; accent-color: var(--neon-cyan);"> Ameaças
+                            </label>
+                            <button id="btn-clear-history" title="Limpar Histórico SQLite" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; transition: color 0.2s;"><i class="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>
                     
@@ -191,6 +199,13 @@
                             <span>Estabelecendo conexão segura com a API SPECTRE_GRID...</span>
                         </div>
                     </div>
+
+                    <div class="terminal-window" id="history-log" style="display: none;">
+                        <div class="log-entry system-msg">
+                            <span class="timestamp">[SQLITE]</span> 
+                            <span>Nenhum registo carregado. Selecione a aba para consultar o histórico.</span>
+                        </div>
+                    </div>
                 </section>
             </aside>
             
@@ -198,6 +213,7 @@
     </div>
 
     <!-- Scripts do Dashboard -->
-    <script src="js/app.js?v=1.0.3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="js/app.js?v=1.0.4"></script>
 </body>
 </html>

@@ -9,11 +9,11 @@
 
 #include "common.h"
 
-// Map for tracking active flows
+// Map for tracking active flows (Key: IP source address for host aggregation)
 struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, MAX_TRACKED_FLOWS);
-    __type(key, struct flow_key_t);
+    __type(key, __u32);
     __type(value, struct flow_metrics_t);
 } flow_map SEC(".maps");
 
@@ -24,6 +24,12 @@ struct {
     __type(key, __u32);
     __type(value, struct block_info_t);
 } block_map SEC(".maps");
+
+// Map for ring buffer (push events to user space)
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 256 * 1024); // 256KB
+} ringbuf SEC(".maps");
 
 SEC("xdp")
 int spectre_xdp_prog(struct xdp_md *ctx) {
@@ -78,8 +84,9 @@ int spectre_xdp_prog(struct xdp_md *ctx) {
         return XDP_PASS; // Not tracking other protocols for now
     }
 
-    // Lookup or initialize metrics
-    struct flow_metrics_t *metrics = bpf_map_lookup_elem(&flow_map, &key);
+    // Lookup or initialize metrics (Using src_ip as the map key)
+    struct flow_metrics_t current_metrics = {};
+    struct flow_metrics_t *metrics = bpf_map_lookup_elem(&flow_map, &src_ip);
     if (metrics) {
         // Update existing flow
         __sync_fetch_and_add(&metrics->bytes, iph->tot_len);
@@ -92,22 +99,40 @@ int spectre_xdp_prog(struct xdp_md *ctx) {
             if (tcph->fin) __sync_fetch_and_add(&metrics->fin_count, 1);
             if (tcph->rst) __sync_fetch_and_add(&metrics->rst_count, 1);
         }
+        current_metrics = *metrics;
     } else {
         // New flow
-        struct flow_metrics_t new_metrics = {};
-        new_metrics.bytes = iph->tot_len;
-        new_metrics.packets = 1;
-        new_metrics.start_time_ns = bpf_ktime_get_ns();
-        new_metrics.last_time_ns = new_metrics.start_time_ns;
+        current_metrics.bytes = iph->tot_len;
+        current_metrics.packets = 1;
+        current_metrics.start_time_ns = bpf_ktime_get_ns();
+        current_metrics.last_time_ns = current_metrics.start_time_ns;
         
         if (tcph) {
-            if (tcph->syn) new_metrics.syn_count = 1;
-            if (tcph->ack) new_metrics.ack_count = 1;
-            if (tcph->fin) new_metrics.fin_count = 1;
-            if (tcph->rst) new_metrics.rst_count = 1;
+            if (tcph->syn) current_metrics.syn_count = 1;
+            if (tcph->ack) current_metrics.ack_count = 1;
+            if (tcph->fin) current_metrics.fin_count = 1;
+            if (tcph->rst) current_metrics.rst_count = 1;
         }
 
-        bpf_map_update_elem(&flow_map, &key, &new_metrics, BPF_ANY);
+        bpf_map_update_elem(&flow_map, &src_ip, &current_metrics, BPF_ANY);
+    }
+
+    // Submit event to User Space via Ring Buffer
+    struct flow_event_t *event = bpf_ringbuf_reserve(&ringbuf, sizeof(struct flow_event_t), 0);
+    if (event) {
+        // Still fill in the key details to keep user space compatibility
+        event->key.src_ip = src_ip;
+        event->key.dst_ip = iph->daddr;
+        event->key.protocol = iph->protocol;
+        if (tcph) {
+            event->key.src_port = tcph->source;
+            event->key.dst_port = tcph->dest;
+        } else if (udph) {
+            event->key.src_port = udph->source;
+            event->key.dst_port = udph->dest;
+        }
+        event->metrics = current_metrics;
+        bpf_ringbuf_submit(event, 0);
     }
 
     return XDP_PASS;

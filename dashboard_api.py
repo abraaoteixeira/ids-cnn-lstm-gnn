@@ -1,6 +1,8 @@
 import asyncio
 import os
 import logging
+import sqlite3
+import json
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -17,8 +19,57 @@ logging.basicConfig(
 logger = logging.getLogger("SPECTRE_API")
 
 SOCKET_PATH = "/tmp/spectre.sock"
+DB_PATH = "spectre_history.db"
 active_connections = set()
 recent_lines = []
+
+def init_db():
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS threat_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                port INTEGER,
+                protocol TEXT,
+                probability REAL,
+                is_threat INTEGER,
+                bytes INTEGER,
+                packets INTEGER
+            )
+        """)
+        conn.commit()
+        conn.close()
+        logger.info("Base de dados SQLite 'spectre_history.db' inicializada com sucesso.")
+    except Exception as e:
+        logger.error(f"Erro ao inicializar base de dados: {e}")
+
+def log_flow_to_db(message_str):
+    try:
+        data = json.loads(message_str)
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO threat_log (timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data.get("timestamp", ""),
+            data.get("src_ip", ""),
+            data.get("dst_ip", ""),
+            data.get("port", 0),
+            data.get("protocol", "TCP"),
+            data.get("probability", 0.0),
+            1 if data.get("is_threat", False) else 0,
+            data.get("bytes", 0),
+            data.get("packets", 0)
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"Erro ao registar fluxo no SQLite: {e}")
 
 async def handle_unix_client(reader, writer):
     logger.info("Novo motor C++ de fusão conectado ao Unix Socket.")
@@ -29,6 +80,9 @@ async def handle_unix_client(reader, writer):
                 break
             message = data.decode('utf-8').strip()
             if message:
+                # Salvar assincronamente no SQLite para evitar bloquear o loop de eventos
+                await asyncio.to_thread(log_flow_to_db, message)
+
                 # Armazenar no cache de histórico recente (máximo 20)
                 recent_lines.append(message)
                 if len(recent_lines) > 20:
@@ -50,7 +104,10 @@ async def handle_unix_client(reader, writer):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Configurar e iniciar Unix Domain Socket Server
+    # Startup: Inicializar BD SQLite
+    init_db()
+
+    # Configurar e iniciar Unix Domain Socket Server
     if os.path.exists(SOCKET_PATH):
         try:
             os.remove(SOCKET_PATH)
@@ -87,6 +144,57 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 @app.get("/")
 async def root():
     return RedirectResponse(url="/static/index.html")
+
+@app.get("/api/history")
+async def get_history(limit: int = 50, only_threats: bool = False):
+    def fetch():
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        query = "SELECT timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets FROM threat_log"
+        if only_threats:
+            query += " WHERE is_threat = 1"
+        query += " ORDER BY id DESC LIMIT ?"
+        cursor.execute(query, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for r in rows:
+            result.append({
+                "timestamp": r[0],
+                "src_ip": r[1],
+                "dst_ip": r[2],
+                "port": r[3],
+                "protocol": r[4],
+                "probability": r[5],
+                "is_threat": bool(r[6]),
+                "bytes": r[7],
+                "packets": r[8]
+            })
+        return result
+
+    try:
+        data = await asyncio.to_thread(fetch)
+        return data
+    except Exception as e:
+        logger.error(f"Erro ao buscar histórico: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/clear_history")
+async def clear_history():
+    def truncate():
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM threat_log")
+        conn.commit()
+        conn.close()
+    try:
+        await asyncio.to_thread(truncate)
+        logger.info("Histórico do banco de dados SQLite apagado pelo utilizador.")
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Erro ao apagar histórico: {e}")
+        return {"error": str(e)}
 
 @app.websocket("/ws/threats")
 async def websocket_endpoint(websocket: WebSocket):

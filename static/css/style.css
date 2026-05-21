@@ -1,35 +1,35 @@
 /* ==========================================================================
-   SPECTRE_GRID ULTRA-PREMIUM CYBERNETIC STYLE SYSTEM
+   SPECTRE_GRID CLOUDFLARE-INSPIRED CYBERNETIC STYLE SYSTEM
    ========================================================================== */
 
 :root {
-    --bg-color: #060b13;
-    --panel-bg: rgba(8, 16, 28, 0.65);
-    --panel-border: rgba(0, 243, 255, 0.12);
-    --panel-border-alarm: rgba(255, 0, 85, 0.25);
+    --bg-color: #0c0e12;
+    --panel-bg: rgba(19, 23, 31, 0.75);
+    --panel-border: rgba(244, 129, 32, 0.15);
+    --panel-border-alarm: rgba(223, 59, 0, 0.3);
     
-    /* Neon Cores */
-    --neon-cyan: #00f3ff;
-    --neon-red: #ff0055;
-    --neon-amber: #ffb700;
-    --neon-green: #10b981;
-    --neon-purple: #9d4edd;
+    /* Neon Cores - Cloudflare Theme */
+    --neon-cyan: #f48120;   /* Cloudflare Orange */
+    --neon-red: #df3b00;    /* Cloudflare Threat Red */
+    --neon-amber: #ff9f1c;  /* Warning Orange-Yellow */
+    --neon-green: #00b188;  /* Safe Rule Teal-Green */
+    --neon-purple: #0070f3; /* Cloud Blue */
     
     /* Cores de Texto */
-    --text-main: #f1f5f9;
-    --text-muted: #94a3b8;
-    --text-dim: #475569;
+    --text-main: #f3f4f6;
+    --text-muted: #8b9bb4;
+    --text-dim: #4b5563;
     
     /* Fontes */
     --font-ui: 'Outfit', 'Inter', sans-serif;
     --font-mono: 'Share Tech Mono', monospace;
     
     /* Sombras e Brilho */
-    --cyan-glow: 0 0 15px rgba(0, 243, 255, 0.3);
-    --red-glow: 0 0 15px rgba(255, 0, 85, 0.4);
-    --glass-blur: blur(12px);
+    --cyan-glow: 0 0 15px rgba(244, 129, 32, 0.35);
+    --red-glow: 0 0 15px rgba(223, 59, 0, 0.45);
+    --glass-blur: blur(14px);
     
-    --transition-speed: 0.3s;
+    --transition-speed: 0.25s;
 }
 
 /* Reset Geral */
@@ -38,7 +38,7 @@
     padding: 0;
     box-sizing: border-box;
     scrollbar-width: thin;
-    scrollbar-color: rgba(0, 243, 255, 0.2) rgba(0, 0, 0, 0.3);
+    scrollbar-color: rgba(244, 129, 32, 0.2) rgba(0, 0, 0, 0.3);
 }
 
 body {
@@ -50,9 +50,9 @@ body {
     overflow: hidden;
     position: relative;
     background-image: 
-        radial-gradient(circle at 10% 20%, rgba(0, 243, 255, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 90% 80%, rgba(157, 78, 221, 0.05) 0%, transparent 40%),
-        radial-gradient(circle at 50% 50%, rgba(255, 0, 85, 0.02) 0%, transparent 50%);
+        radial-gradient(circle at 10% 20%, rgba(244, 129, 32, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(0, 112, 243, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 50% 50%, rgba(223, 59, 0, 0.02) 0%, transparent 50%);
 }
 
 /* Grelha de Fundo High-Tech */
@@ -891,4 +891,27 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 243, 255, 0.5);
+}
+
+/* Classes para Controle de Abas */
+.active-tab {
+    opacity: 1 !important;
+    border-bottom: 2px solid var(--neon-cyan);
+    padding-bottom: 4px;
+    color: var(--text-main);
+}
+
+.inactive-tab {
+    opacity: 0.4;
+    color: var(--text-muted) !important;
+    transition: opacity var(--transition-speed), color var(--transition-speed);
+}
+
+.inactive-tab:hover {
+    opacity: 0.8;
+    color: var(--text-main) !important;
+}
+
+#btn-clear-history:hover {
+    color: var(--neon-red) !important;
 }

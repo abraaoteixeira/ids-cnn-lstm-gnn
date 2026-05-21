@@ -4,12 +4,12 @@
 
 // Cores para renderização do Canvas GNN (compatível com todos os browsers)
 const colors = {
-    cyan: '#00f3ff',
-    red: '#ff0055',
-    amber: '#ffb700',
-    green: '#10b981',
-    purple: '#9d4edd',
-    textMuted: '#94a3b8'
+    cyan: '#00b188',   // Safe Teal-Green (Cloudflare style)
+    red: '#df3b00',    // Threat Red/Orange (Cloudflare security)
+    amber: '#f48120',  // Cloudflare Orange (Warning)
+    green: '#00e575',  // Bright Green
+    purple: '#0070f3', // Cloud Blue (previously purple)
+    textMuted: '#8b9bb4'
 };
 
 // Elementos de UI
@@ -91,33 +91,7 @@ class GNNNode {
         this.volume = 0;
         this.connections = 0;
         this.role = isServer ? "Server" : "Client Host";
-    }
-
-    update() {
-        if (isFrozen || draggedNode === this) return;
-
-        // Fricção/Amortecimento
-        this.vx *= 0.82;
-        this.vy *= 0.82;
-
-        // Atualizar coordenadas
-        this.x += this.vx;
-        this.y += this.vy;
-
-        // Restrição de limites físicos da tela
-        const margin = 40;
-        if (this.x < margin) { this.x = margin; this.vx = 0; }
-        if (this.x > width - margin) { this.x = width - margin; this.vx = 0; }
-        if (this.y < margin) { this.y = margin; this.vy = 0; }
-        if (this.y > height - margin) { this.y = height - margin; this.vy = 0; }
-
-        // Diminuir temporizador de choque de ameaça
-        if (this.threatTimer > 0) {
-            this.threatTimer -= 0.016;
-            if (this.threatTimer <= 0) {
-                this.threatActive = false;
-            }
-        }
+        this.lastSeen = Date.now();
     }
 }
 
@@ -171,63 +145,56 @@ servers.forEach(srv => {
     nodes.set(srv, new GNNNode(srv, true));
 });
 
-// Algoritmo de Física: Repulsão, Atração e Gravidade Central
-function applyPhysics() {
-    const nodeList = Array.from(nodes.values());
-    const kRepulsion = 12000; // Força de afastamento entre IPs
-    const kAttraction = 0.008; // Força de atração elástica dos links
-    const centerGravity = 0.002; // Força para puxar tudo de volta ao centro
+// Setup da simulação física D3-Force
+let d3Nodes = Array.from(nodes.values());
+let d3Links = [];
 
-    // 1. Repulsão entre todos os nós (N^2 mas rápido para < 50 nós)
-    for (let i = 0; i < nodeList.length; i++) {
-        const nA = nodeList[i];
-        for (let j = i + 1; j < nodeList.length; j++) {
-            const nB = nodeList[j];
-            const dx = nB.x - nA.x;
-            const dy = nB.y - nA.y;
-            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            
-            if (dist < 400) { // Aumentado o raio de repulsão de 280 para 400
-                const force = kRepulsion / (dist * dist);
-                const fx = (dx / dist) * force;
-                const fy = (dy / dist) * force;
-                
-                nA.vx -= fx;
-                nA.vy -= fy;
-                nB.vx += fx;
-                nB.vy += fy;
+const simulation = d3.forceSimulation(d3Nodes)
+    .force("link", d3.forceLink(d3Links).id(d => d.ip).distance(130).strength(0.08))
+    .force("charge", d3.forceManyBody().strength(-350).distanceMax(300))
+    .force("center", d3.forceCenter(width / 2, height / 2).strength(0.02))
+    .force("collision", d3.forceCollide().radius(d => d.radius + 15))
+    .on("tick", () => {
+        const margin = 40;
+        d3Nodes.forEach(node => {
+            if (node.x < margin) node.x = margin;
+            if (node.x > width - margin) node.x = width - margin;
+            if (node.y < margin) node.y = margin;
+            if (node.y > height - margin) node.y = height - margin;
+        });
+    });
+
+function updateD3Simulation() {
+    d3Nodes = Array.from(nodes.values());
+    d3Links = edges.map(e => ({
+        source: e.source.ip,
+        target: e.target.ip
+    }));
+    
+    simulation.nodes(d3Nodes);
+    simulation.force("link").links(d3Links);
+    if (!isFrozen) {
+        simulation.alpha(0.3).restart();
+    }
+}
+
+// Inicializa a simulação D3 com os nós servidores iniciais
+updateD3Simulation();
+
+// Atualiza o estado dos temporizadores de ameaças nos nós e cores das arestas
+function applyPhysics() {
+    nodes.forEach(node => {
+        if (node.threatTimer > 0) {
+            node.threatTimer -= 0.016;
+            if (node.threatTimer <= 0) {
+                node.threatActive = false;
             }
         }
-    }
+    });
 
-    // 2. Atração por Arestas (Links)
     edges.forEach(edge => {
-        const nA = edge.source;
-        const nB = edge.target;
-        const dx = nB.x - nA.x;
-        const dy = nB.y - nA.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        
-        const force = dist * kAttraction;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        
-        nA.vx += fx;
-        nA.vy += fy;
-        nB.vx -= fx;
-        nB.vy -= fy;
+        edge.update();
     });
-
-    // 3. Força de Gravidade ao Centro da Tela
-    nodeList.forEach(node => {
-        const dx = width / 2 - node.x;
-        const dy = height / 2 - node.y;
-        node.vx += dx * centerGravity;
-        node.vy += dy * centerGravity;
-    });
-
-    // 4. Aplicar velocidades
-    nodeList.forEach(node => node.update());
 }
 
 // Loop Principal de Renderização do Canvas GNN
@@ -241,10 +208,10 @@ function drawGNNGraph() {
         ctx.lineTo(edge.target.x, edge.target.y);
         
         if (edge.isThreat) {
-            ctx.strokeStyle = `rgba(255, 0, 85, ${0.15 + edge.colorTimer * 0.85})`;
+            ctx.strokeStyle = `rgba(223, 59, 0, ${0.2 + edge.colorTimer * 0.8})`;
             ctx.lineWidth = 2.5;
         } else {
-            ctx.strokeStyle = `rgba(0, 243, 255, ${0.05 + edge.colorTimer * 0.4})`;
+            ctx.strokeStyle = `rgba(0, 177, 136, ${0.08 + edge.colorTimer * 0.45})`;
             ctx.lineWidth = 1.2;
         }
         ctx.stroke();
@@ -265,7 +232,7 @@ function drawGNNGraph() {
         if (node.threatActive) {
             ctx.beginPath();
             ctx.arc(node.x, node.y, node.radius * (1 + (1 - node.threatTimer) * 1.5), 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(255, 0, 85, ${node.threatTimer})`;
+            ctx.strokeStyle = `rgba(223, 59, 0, ${node.threatTimer})`;
             ctx.lineWidth = 2;
             ctx.stroke();
         }
@@ -276,19 +243,19 @@ function drawGNNGraph() {
         
         let grad = ctx.createRadialGradient(node.x, node.y, 2, node.x, node.y, node.radius);
         if (node.threatActive) {
-            grad.addColorStop(0, '#ff4d6d');
+            grad.addColorStop(0, '#ff7c5c');
             grad.addColorStop(1, colors.red);
             ctx.fillStyle = grad;
             ctx.shadowBlur = 15;
             ctx.shadowColor = colors.red;
         } else if (node.isServer) {
-            grad.addColorStop(0, '#c77dff');
+            grad.addColorStop(0, '#75b3ff');
             grad.addColorStop(1, colors.purple);
             ctx.fillStyle = grad;
             ctx.shadowBlur = 10;
             ctx.shadowColor = colors.purple;
         } else {
-            grad.addColorStop(0, '#a0f6ff');
+            grad.addColorStop(0, '#a2ffd0');
             grad.addColorStop(1, colors.cyan);
             ctx.fillStyle = grad;
             ctx.shadowBlur = selectedNode === node ? 14 : 0;
@@ -308,7 +275,7 @@ function drawGNNGraph() {
 
         // Texto com o IP do Nó
         ctx.font = '10px "Share Tech Mono"';
-        ctx.fillStyle = node.threatActive ? '#ffa6c9' : colors.textMuted;
+        ctx.fillStyle = node.threatActive ? '#ffbca6' : colors.textMuted;
         ctx.textAlign = 'center';
         ctx.fillText(node.ip.split(' ')[0], node.x, node.y - node.radius - 6);
     });
@@ -335,6 +302,12 @@ canvas.addEventListener('mousedown', e => {
         selectedNode = clicked;
         draggedNode = clicked;
         showNodeHUD(clicked);
+        
+        // Pinar nó para o arrasto no D3
+        if (!isFrozen) {
+            draggedNode.fx = draggedNode.x;
+            draggedNode.fy = draggedNode.y;
+        }
     } else {
         selectedNode = null;
         nodeHudPanel.classList.remove('active');
@@ -344,14 +317,31 @@ canvas.addEventListener('mousedown', e => {
 canvas.addEventListener('mousemove', e => {
     if (!draggedNode) return;
     const rect = canvas.getBoundingClientRect();
-    draggedNode.x = e.clientX - rect.left;
-    draggedNode.y = e.clientY - rect.top;
-    draggedNode.vx = 0;
-    draggedNode.vy = 0;
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    draggedNode.x = x;
+    draggedNode.y = y;
+    
+    if (isFrozen) {
+        draggedNode.fx = x;
+        draggedNode.fy = y;
+    } else {
+        draggedNode.fx = x;
+        draggedNode.fy = y;
+        simulation.alphaTarget(0.3).restart(); // reaquece a simulação durante o arrasto
+    }
 });
 
 window.addEventListener('mouseup', () => {
-    draggedNode = null;
+    if (draggedNode) {
+        if (!isFrozen) {
+            draggedNode.fx = null;
+            draggedNode.fy = null;
+        }
+        draggedNode = null;
+        simulation.alphaTarget(0);
+    }
 });
 
 // Controlos de Congelar e Reposicionar Nós
@@ -361,13 +351,34 @@ btnResetLayout.addEventListener('click', () => {
         node.y = height / 2 + (Math.random() - 0.5) * 150;
         node.vx = 0;
         node.vy = 0;
+        if (isFrozen) {
+            node.fx = node.x;
+            node.fy = node.y;
+        } else {
+            node.fx = null;
+            node.fy = null;
+        }
     });
+    updateD3Simulation();
 });
 
 btnFreezeLayout.addEventListener('click', () => {
     isFrozen = !isFrozen;
     btnFreezeLayout.classList.toggle('active', isFrozen);
     btnFreezeLayout.innerHTML = isFrozen ? `<i class="fa-solid fa-unlock"></i>` : `<i class="fa-solid fa-lock"></i>`;
+    if (isFrozen) {
+        simulation.stop();
+        nodes.forEach(n => {
+            n.fx = n.x;
+            n.fy = n.y;
+        });
+    } else {
+        nodes.forEach(n => {
+            n.fx = null;
+            n.fy = null;
+        });
+        simulation.alpha(0.3).restart();
+    }
 });
 
 btnCloseHud.addEventListener('click', () => {
@@ -482,19 +493,27 @@ function connectWebSocket() {
 
     socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
+        let isGraphChanged = false;
+        const now = Date.now();
         
         // 1. Processar Nós e Arestas
         let srcNode = nodes.get(data.src_ip);
         if (!srcNode) {
             srcNode = new GNNNode(data.src_ip);
             nodes.set(data.src_ip, srcNode);
+            isGraphChanged = true;
         }
         
         let dstNode = nodes.get(data.dst_ip);
         if (!dstNode) {
             dstNode = new GNNNode(data.dst_ip);
             nodes.set(data.dst_ip, dstNode);
+            isGraphChanged = true;
         }
+
+        // Atualizar marcação de atividade
+        srcNode.lastSeen = now;
+        dstNode.lastSeen = now;
 
         // Atualizar estatísticas dos nós
         srcNode.connections++;
@@ -522,9 +541,15 @@ function connectWebSocket() {
         if (!edge) {
             edge = new GNNEdge(srcNode, dstNode, data.is_threat);
             edges.push(edge);
+            isGraphChanged = true;
         } else {
             edge.isThreat = edge.isThreat || data.is_threat;
             edge.colorTimer = 1.0;
+        }
+
+        // Se houver novos nós ou novas conexões, atualizar simulação física D3
+        if (isGraphChanged) {
+            updateD3Simulation();
         }
 
         // Spawn de Partícula
@@ -730,10 +755,223 @@ function addSystemLog(title, msg, isError = false) {
     terminalLog.scrollTop = terminalLog.scrollHeight;
 }
 
+// Rotina de Coleta de Lixo para Nós Clientes Inativos (Garbage Collection)
+function pruneInactiveNodes() {
+    const now = Date.now();
+    const maxIdleTime = 30000; // 30 segundos de inatividade
+    let changed = false;
+
+    // Rastrear nós clientes inativos
+    nodes.forEach((node, ip) => {
+        // Ignorar servidores, nós sob ameaça ativa ou IPs do namespace de teste WSL
+        if (node.isServer || node.threatActive || ip.startsWith("10.0.0.1") || ip.startsWith("10.0.0.2")) {
+            return;
+        }
+
+        if (now - node.lastSeen > maxIdleTime) {
+            nodes.delete(ip);
+            changed = true;
+            addSystemLog('GARBAGE COLLECTOR', `Removido nó inativo: ${ip}`);
+        }
+    });
+
+    if (changed) {
+        // Limpar arestas órfãs
+        const initialEdges = edges.length;
+        for (let i = edges.length - 1; i >= 0; i--) {
+            const edge = edges[i];
+            if (!nodes.has(edge.source.ip) || !nodes.has(edge.target.ip)) {
+                edges.splice(i, 1);
+            }
+        }
+        console.log(`[GC] Liberação de memória completa. Nós atuais: ${nodes.size}, Arestas: ${edges.length}`);
+        
+        // Atualizar simulação do D3-Force com o novo grafo
+        updateD3Simulation();
+    }
+}
+
+// Iniciar Coleta de Lixo a cada 5 segundos
+setInterval(pruneInactiveNodes, 5000);
 
 // ==========================================================================
 // 4. INICIALIZAÇÕES E TIMERS DO DASHBOARD
 // ==========================================================================
+
+// Elementos das Abas e Histórico SQLite
+const tabLive = document.getElementById('tab-live');
+const tabHistory = document.getElementById('tab-history');
+const liveActions = document.getElementById('live-actions');
+const historyActions = document.getElementById('history-actions');
+const historyLog = document.getElementById('history-log');
+const chkOnlyThreats = document.getElementById('chk-only-threats');
+const btnClearHistory = document.getElementById('btn-clear-history');
+
+let activeTab = 'live';
+
+tabLive.addEventListener('click', () => {
+    if (activeTab === 'live') return;
+    activeTab = 'live';
+    
+    tabLive.className = 'active-tab';
+    tabHistory.className = 'inactive-tab';
+    
+    liveActions.style.display = 'flex';
+    historyActions.style.display = 'none';
+    
+    terminalLog.style.display = 'flex';
+    historyLog.style.display = 'none';
+});
+
+tabHistory.addEventListener('click', () => {
+    if (activeTab === 'history') return;
+    activeTab = 'history';
+    
+    tabLive.className = 'inactive-tab';
+    tabHistory.className = 'active-tab';
+    
+    liveActions.style.display = 'none';
+    historyActions.style.display = 'flex';
+    
+    terminalLog.style.display = 'none';
+    historyLog.style.display = 'flex';
+    
+    fetchSQLiteHistory();
+});
+
+chkOnlyThreats.addEventListener('change', () => {
+    if (activeTab === 'history') {
+        fetchSQLiteHistory();
+    }
+});
+
+btnClearHistory.addEventListener('click', async () => {
+    if (confirm("Deseja mesmo apagar todo o histórico persistido no SQLite?")) {
+        try {
+            const response = await fetch('/api/clear_history', { method: 'POST' });
+            const res = await response.json();
+            if (res.status === 'success') {
+                addSystemLog('SQLITE CLEAN', 'Base de dados histórica limpa com sucesso.');
+                fetchSQLiteHistory();
+            } else {
+                console.error("Erro ao limpar histórico:", res.error);
+            }
+        } catch (err) {
+            console.error("Falha na ligação à API:", err);
+        }
+    }
+});
+
+async function fetchSQLiteHistory() {
+    historyLog.innerHTML = `
+        <div class="log-entry system-msg">
+            <span class="timestamp">[SQLITE]</span> 
+            <span>Carregando histórico do banco de dados...</span>
+        </div>
+    `;
+    
+    const onlyThreats = chkOnlyThreats.checked;
+    const url = `/api/history?limit=100&only_threats=${onlyThreats}`;
+    
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error) {
+            historyLog.innerHTML = `
+                <div class="log-entry system-msg" style="color: var(--neon-red)">
+                    <span class="timestamp">[ERRO]</span> 
+                    <span>Falha ao carregar dados: ${data.error}</span>
+                </div>
+            `;
+            return;
+        }
+        
+        if (data.length === 0) {
+            historyLog.innerHTML = `
+                <div class="log-entry system-msg">
+                    <span class="timestamp">[SQLITE]</span> 
+                    <span>Nenhum registo encontrado no banco de dados.</span>
+                </div>
+            `;
+            return;
+        }
+        
+        historyLog.innerHTML = '';
+        data.forEach(item => {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${item.is_threat ? 'anomaly' : ''}`;
+            
+            // Usar layout premium similar ao console principal
+            const sign = item.is_threat ? '<i class="fa-solid fa-shield-virus text-red"></i>' : '<i class="fa-solid fa-circle-check text-green"></i>';
+            const riskPct = (item.probability).toFixed(1);
+            
+            entry.innerHTML = `
+                <div class="left-data">
+                    <span class="timestamp">[${item.timestamp}]</span>
+                    <span class="flow">${item.src_ip} ➔ ${item.dst_ip} (${item.protocol}/${item.port})</span>
+                    <span class="meta">${(item.bytes / 1024).toFixed(1)} KB | ${item.packets} pacotes</span>
+                </div>
+                <div class="right-data">
+                    <span class="score" style="color: ${item.is_threat ? 'var(--neon-red)' : 'var(--neon-green)'}">
+                        ${sign} GAT: ${riskPct}%
+                    </span>
+                </div>
+            `;
+            
+            // Adicionar evento para inspecionar fluxo histórico
+            entry.addEventListener('click', () => {
+                showHistoricalInspection(item);
+            });
+            
+            historyLog.appendChild(entry);
+        });
+    } catch (err) {
+        console.error("Falha ao contactar a API de histórico:", err);
+        historyLog.innerHTML = `
+            <div class="log-entry system-msg" style="color: var(--neon-red)">
+                <span class="timestamp">[ERRO]</span> 
+                <span>Erro de comunicação: ${err.message}</span>
+            </div>
+        `;
+    }
+}
+
+// Inspecionar fluxo histórico
+function showHistoricalInspection(item) {
+    const flowInspector = document.getElementById('flow-inspector');
+    
+    // Formatar volume
+    let vol = item.bytes;
+    let volStr = vol > 1024 * 1024 ? `${(vol / (1024 * 1024)).toFixed(1)} MB` : `${(vol / 1024).toFixed(1)} KB`;
+    
+    flowInspector.innerHTML = `
+        <div class="threat-inspector-card">
+            <div class="inspect-header">
+                <span class="flow-badge">REGISTO HISTÓRICO</span>
+                <span class="${item.is_threat ? 'danger-tag' : 'normal-tag'}">
+                    ${item.is_threat ? 'MITIGADO (XDP_DROP)' : 'SEGURO'}
+                </span>
+            </div>
+            <div class="inspect-grid">
+                <span class="label">Origem IP:</span><span class="val">${item.src_ip}</span>
+                <span class="label">Destino IP:</span><span class="val">${item.dst_ip}</span>
+                <span class="label">Porta Alvo:</span><span class="val">${item.port}</span>
+                <span class="label">Protocolo:</span><span class="val">${item.protocol}</span>
+                <span class="label">Volume Total:</span><span class="val">${volStr}</span>
+                <span class="label">Pacotes:</span><span class="val">${item.packets}</span>
+                <span class="label">Risco GNN:</span><span class="val text-cyan">${(item.probability).toFixed(1)}%</span>
+            </div>
+            <div class="inspect-footer ${item.is_threat ? '' : 'safe-footer'}">
+                <i class="fa-solid ${item.is_threat ? 'fa-user-shield' : 'fa-check-double'}"></i>
+                <span>${item.is_threat ? 
+                    'Ameaça mitigada. Fluxo gravado em base de dados.' : 
+                    'Tráfego regular sem anomalias detectadas.'}
+                </span>
+            </div>
+        </div>
+    `;
+}
 
 // Relógio do Sistema em tempo real
 function updateClock() {

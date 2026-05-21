@@ -33,4 +33,10 @@ struct block_info_t {
     __u64 blocked_packets;
 };
 
+// Event structure for the Ring Buffer
+struct flow_event_t {
+    struct flow_key_t key;
+    struct flow_metrics_t metrics;
+};
+
 #endif /* SPECTRE_EBPF_COMMON_H */

@@ -82,6 +82,11 @@ struct FlowContext {
 
     // Pico histórico de PPS (burst detection)
     float peak_pps = 0.0f;
+
+    // Últimas métricas e chave recebidas via Ring Buffer
+    flow_metrics_t latest_metrics = {};
+    flow_key_t latest_key = {};
+    bool has_update = false;
 };
 
 // =====================================================================
@@ -319,6 +324,34 @@ static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, 
     }
 }
 
+static int handle_event(void *ctx, void *data, size_t data_len) {
+    if (data_len < sizeof(struct flow_event_t)) {
+        return 0;
+    }
+    auto *event = reinterpret_cast<struct flow_event_t *>(data);
+    auto *flow_tracker = reinterpret_cast<std::unordered_map<uint32_t, FlowContext> *>(ctx);
+
+    uint32_t src_ip = event->key.src_ip;
+    FlowContext& fctx = (*flow_tracker)[src_ip];
+
+    // Primeira observação: salvar snapshot e pular (sem delta ainda)
+    if (fctx.norm_n == 0 && fctx.packet_count == 0) {
+        fctx.prev_bytes   = event->metrics.bytes;
+        fctx.prev_packets = event->metrics.packets;
+        fctx.prev_syn     = event->metrics.syn_count;
+        fctx.prev_ack     = event->metrics.ack_count;
+        fctx.prev_fin     = event->metrics.fin_count;
+        fctx.prev_rst     = event->metrics.rst_count;
+        fctx.prev_ts_ns   = clock_ns();
+    }
+
+    fctx.latest_metrics = event->metrics;
+    fctx.latest_key = event->key;
+    fctx.has_update = true;
+
+    return 0;
+}
+
 // =====================================================================
 // MAIN
 // =====================================================================
@@ -427,6 +460,21 @@ int main(int argc, char **argv) {
     // =====================================================================
     std::unordered_map<uint32_t, FlowContext> flow_tracker;
 
+    // Encontrar o mapa do Ring Buffer
+    struct bpf_map *bpf_ringbuf = bpf_object__find_map_by_name(obj, "ringbuf");
+    int ringbuf_map_fd = bpf_map__fd(bpf_ringbuf);
+    if (ringbuf_map_fd < 0) {
+        std::cerr << "Erro critico: Ring Buffer nao encontrado." << std::endl;
+        return 1;
+    }
+
+    // Inicialização do Ring Buffer
+    struct ring_buffer *rb = ring_buffer__new(ringbuf_map_fd, handle_event, &flow_tracker, NULL);
+    if (!rb) {
+        std::cerr << "Erro critico: Falha ao inicializar o Ring Buffer." << std::endl;
+        return 1;
+    }
+
     // Edge tensor pré-alocado (self-loop, reutilizado a cada inferência)
     torch::Tensor edge_tensor = torch::tensor({{0}, {0}}, torch::kLong);
 
@@ -444,44 +492,57 @@ int main(int argc, char **argv) {
     // =====================================================================
     // HOT LOOP — ZERO ALOCAÇÃO DINÂMICA
     // =====================================================================
+    uint64_t last_scan_ns = clock_ns();
+
     while (!exiting) {
-        struct flow_key_t key = {}, next_key;
-        struct flow_metrics_t metrics;
+        // Poll de eventos com timeout de 100ms
+        int err = ring_buffer__poll(rb, 100);
+        if (err < 0 && err != -EINTR) {
+            std::cerr << "Erro ao fazer poll no Ring Buffer: " << err << std::endl;
+            break;
+        }
+
         uint64_t now = clock_ns();
 
-        int flows_seen = 0;
-        int inferences_run = 0;
+        // A cada 1 segundo, executa a agregação e a inferência GNN dos fluxos ativos
+        if (now - last_scan_ns >= 1000000000ULL) {
+            last_scan_ns = now;
+            int flows_seen = 0;
+            int inferences_run = 0;
 
-        while (bpf_map_get_next_key(flow_map_fd, &key, &next_key) == 0) {
-            if (bpf_map_lookup_elem(flow_map_fd, &next_key, &metrics) == 0) {
-                flows_seen++;
+            for (auto& pair : flow_tracker) {
+                uint32_t src_ip = pair.first;
+                FlowContext& ctx = pair.second;
 
-                // Indexar FlowContext pelo IP de origem
-                uint32_t src_ip = next_key.src_ip;
-                FlowContext& ctx = flow_tracker[src_ip];
-
-                // Primeira observação: salvar snapshot e pular (sem delta ainda)
-                if (ctx.norm_n == 0 && ctx.packet_count == 0) {
-                    ctx.prev_bytes   = metrics.bytes;
-                    ctx.prev_packets = metrics.packets;
-                    ctx.prev_syn     = metrics.syn_count;
-                    ctx.prev_ack     = metrics.ack_count;
-                    ctx.prev_fin     = metrics.fin_count;
-                    ctx.prev_rst     = metrics.rst_count;
-                    ctx.prev_ts_ns   = now;
-                    key = next_key;
+                // Apenas processa se o fluxo recebeu atualizações no último 1s
+                if (!ctx.has_update) {
                     continue;
                 }
+                ctx.has_update = false; // Reset da flag
+                flows_seen++;
+
+                const flow_metrics_t& metrics = ctx.latest_metrics;
 
                 // --- PASSO 2a: Derivar 20 features (stack-only) ---
                 std::array<float, NUM_FEATURES> feat = {};
                 derive_features(metrics, ctx, now, feat);
 
+                // Guardar métricas brutas para o motor de heurística híbrido (volumetria)
+                float raw_pps = feat[7];
+                float raw_syn_ratio = feat[9];
+
                 // --- PASSO 2b: Normalizar Z-score (Welford online) ---
                 normalize_zscore(ctx, feat);
 
-                // --- PASSO 2c: Inserir no ring buffer (ponteiro circular) ---
-                ctx.ring_buffer[ctx.current_index] = feat;
+                // --- PASSO 2c: Inserir no ring buffer (Reordenado para alinhar com o treinamento) ---
+                // Mapeamento dos índices de features de acordo com top20_features.json do treinamento
+                const int MODEL_FEATURE_MAPPING[20] = {13, 6, 17, 10, 7, 19, 14, 5, 4, 16, 9, 11, 0, 15, 8, 2, 3, 1, 12, 18};
+                std::array<float, NUM_FEATURES> reordered_feat = {};
+                for (int i = 0; i < NUM_FEATURES; ++i) {
+                    reordered_feat[i] = feat[MODEL_FEATURE_MAPPING[i]];
+                }
+
+                ctx.ring_buffer[ctx.current_index] = reordered_feat;
                 ctx.current_index = (ctx.current_index + 1) % SEQ_LEN;
                 ctx.packet_count++;
 
@@ -505,6 +566,11 @@ int main(int argc, char **argv) {
                         total_inferences++;
                         inferences_run++;
 
+                        // --- MOTOR HÍBRIDO: Sobrescrita Heurística para Alta Volumetria / SYN Flood ---
+                        if (raw_pps > 100.0f && raw_syn_ratio > 0.8f) {
+                            prob = 0.98f;
+                        }
+
                         // --- GATILHO XDP_DROP ---
                         if (prob > DROP_THRESH) {
                             std::cout << "[ALERTA CRITICO - XDP_DROP] IP: "
@@ -522,22 +588,36 @@ int main(int argc, char **argv) {
                     } catch (const c10::Error& e) {
                         std::cerr << "[ERRO] forward() falhou: " << e.what() << std::endl;
                     }
+                } else {
+                    // Se ainda não temos 10 segundos de tráfego, mas já há ataque óbvio na janela atual,
+                    // aplicamos a detecção heurística imediata para evitar lag na mitigação!
+                    if (raw_pps > 100.0f && raw_syn_ratio > 0.8f) {
+                        prob = 0.98f;
+                        std::cout << "[ALERTA PRECOCE - MOTOR HIBRIDO] IP: "
+                                  << format_ip(src_ip)
+                                  << " | Prob: " << (prob * 100.0f) << "%"
+                                  << " | Bloqueio imediato XDP_DROP!"
+                                  << std::endl;
+
+                        struct block_info_t binfo = {};
+                        binfo.block_time_ns = now;
+                        binfo.blocked_packets = 0;
+                        bpf_map_update_elem(block_map_fd, &src_ip, &binfo, BPF_ANY);
+                        total_blocks++;
+                    }
                 }
 
                 // Gravar fluxo/alerta no log em tempo real para o Dashboard
                 write_cpp_alert_to_log(src_ip, prob, metrics.bytes, metrics.packets);
             }
-            key = next_key;
-        }
 
-        if (flows_seen > 0) {
-            std::cout << "[INFO] " << flows_seen << " fluxos | "
-                      << inferences_run << " inferencias | "
-                      << flow_tracker.size() << " IPs rastreados | "
-                      << total_blocks << " bloqueios" << std::endl;
+            if (flows_seen > 0) {
+                std::cout << "[INFO] " << flows_seen << " fluxos ativos | "
+                          << inferences_run << " inferencias | "
+                          << flow_tracker.size() << " IPs rastreados | "
+                          << total_blocks << " bloqueios" << std::endl;
+            }
         }
-
-        sleep(1);
     }
 
     // =====================================================================
@@ -551,6 +631,9 @@ int main(int argc, char **argv) {
 
     if (attached_native) bpf_link__destroy(link);
     else                 bpf_xdp_detach(ifindex, XDP_FLAGS_SKB_MODE, NULL);
+
+    // Liberação do Ring Buffer
+    ring_buffer__free(rb);
     bpf_object__close(obj);
 
     return 0;
