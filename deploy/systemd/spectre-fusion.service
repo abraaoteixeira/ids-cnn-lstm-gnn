@@ -1,0 +1,15 @@
+[Unit]
+Description=SPECTRE_GRID Data Plane (C++ eBPF Motor)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/mnt/c/Users/abraa/Documents/ids-cnn-lstm-gnn/build
+# Assumindo a interface padrao descoberta pelo start_spectre.sh
+ExecStart=/mnt/c/Users/abraa/Documents/ids-cnn-lstm-gnn/build/spectre_fusion eth0
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=SPECTRE_GRID Dashboard Web
+After=network.target
+
+[Service]
+Type=simple
+User=abraa
+WorkingDirectory=/mnt/c/Users/abraa/Documents/ids-cnn-lstm-gnn/static
+ExecStart=/usr/bin/python3 -m http.server 8080
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
