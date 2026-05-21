@@ -16,26 +16,47 @@ O **SPECTRE_GRID** é um ecossistema industrial de Detecção e Prevenção de I
 O sistema opera sob o modelo de **Produtor-Consumidor** de três camadas para garantir latência ultrabaixa de nível de kernel com capacidade cognitiva em tempo real:
 
 ```mermaid
-graph TD
+graph LR
     %% Estilização
     classDef kernel fill:#f96,stroke:#333,stroke-width:2px;
     classDef daemon fill:#69c,stroke:#333,stroke-width:2px;
     classDef api fill:#4db6ac,stroke:#333,stroke-width:2px;
     classDef view fill:#ff8a80,stroke:#333,stroke-width:2px;
 
-    A[Tráfego Físico / Virtual] -->|Filtragem de Driver| B(Kernel space: eBPF / XDP prog):::kernel
-    B -->|IP na Blacklist| C{XDP_DROP}:::kernel
-    B -->|IP Seguro: Incrementa Métricas| D[Kernel LRU Map: flow_map]:::kernel
+    subgraph Kernel Space [Kernel Space - eBPF / XDP]
+        B(Kernel space: eBPF / XDP prog):::kernel
+        C{XDP_DROP}:::kernel
+        D[Kernel LRU Map: flow_map]:::kernel
+    end
+
+    subgraph User Space [User Space Daemon]
+        E(loader_fusion Daemon):::daemon
+        F[Ring Buffer: Shape 10x20]:::daemon
+        G{Decisão de Ameaça}:::daemon
+        H[block_map Updater]:::daemon
+    end
+
+    subgraph Control Plane [Control Plane & Telemetria]
+        I(IPC Unix Domain Socket)
+        J(FastAPI Server: dashboard_api.py):::api
+        L[(SQLite: spectre_history.db)]:::api
+        K[Dashboard Topology: app.js]:::view
+    end
+
+    A[Tráfego de Rede] -->|Filtro de Driver| B
+    B -->|IP na Blacklist| C
+    B -->|IP Seguro: Métricas| D
     
-    E(User Space Daemon: loader_fusion):::daemon -->|Leitura Atômica Sem Polling| D
-    E -->|Normalização de Welford| F[Ring Buffer Temporizado: Shape 10x20]:::daemon
-    F -->|Inferência LibTorch GNN| G{Decisão de Ameaça}:::daemon
-    G -->|Probabilidade > 95%| H[Injeta IP no block_map do Kernel]:::daemon
-    G -->|Alerta / Telemetria| I(IPC Unix Domain Socket)
+    D -->|Leitura Atômica| E
+    E -->|Welford Z-Score| F
+    F -->|Inferência LibTorch| G
+    G -->|Probabilidade > 95%| H
+    H -->|Mitigação Atômica| B
+    G -->|Alerta / Telemetria| I
     
-    J(FastAPI Server: dashboard_api.py):::api -->|Escuta de Eventos| I
-    J -->|Persistência| L[(SQLite: spectre_history.db)]:::api
-    J -->|WebSockets Live| K[Dashboard Topology: app.js]:::view
+    I -->|Escuta IPC| J
+    J -->|Persistência| L
+    J -->|WebSockets Live| K
 ```
 
 ### 1. Data Plane (Kernel Space)
