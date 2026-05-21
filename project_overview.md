@@ -38,6 +38,7 @@ A arquitetura do modelo `SPECTRE_GRID` é baseada no artigo científico *ICICNIS
 ### B. Engenharia e Pré-processamento (`preprocessor.py` & `train.py`)
 * **Seleção de Features:** Executa One-Hot Encoding em colunas de protocolo, serviço e flags. Seleciona automaticamente as **Top-20 Features** com maior correlação linear absoluta (Pearson) em relação à coluna alvo (*target*).
 * **Construção do Grafo:** Converte os fluxos em um objeto `Data` do PyTorch Geometric, gerando uma representação topológica real da rede baseada nos IPs de origem e destino.
+* **Resiliência de Dados:** O modelo foi validado inicialmente com dados legados e evoluiu para a adoção do dataset **CIC-IDS2017 Full Processed**, garantindo resiliência e validação contra vetores de ataques modernos (DDoS, PortScan, Web Attacks).
 
 ---
 
@@ -59,12 +60,20 @@ Um daemon em C++ que une o eBPF à IA do LibTorch:
 ## 4. O Visualizador e Dashboard (`dashboard_api.py` & `static/`)
 
 * **Interface Visual de Alto Padrão:** O dashboard foi desenvolvido com estética voltada à cibersegurança (modo escuro com realces neon e animações fluidas).
-* **Visualização da Topologia GNN (`app.js`):** Um motor de física de grafos direcionados (*Force-Directed Graph Layout*) renderiza os IPs como nós dinâmicos que se atraem e se repelem no Canvas HTML5 em tempo real.
-* **Ingestão Leve:** Utiliza WebSockets no FastAPI para escutar alterações no log de alertas e empurrar as partículas de dados no grafo visual.
+* **Visualização da Topologia GNN (`app.js`):** Um motor de física de grafos direcionados (*Force-Directed Graph Layout*) renderiza os IPs como nós dinâmicos no Canvas HTML5 em tempo real. Recentemente recebeu atualizações nas regras físicas anti-aglomeração para suportar ataques massivos (ex: DDoS) sem quebra de estabilidade.
+* **Ingestão Leve e Persistência:** Utiliza WebSockets no FastAPI para telemetria ao vivo e introduz banco de dados local SQLite (`spectre_history.db`) para persistir o histórico de ameaças de longo prazo.
 
 ---
 
-## 5. Regras de Safe Deploy e Operações do Repositório
+## 5. Infraestrutura de Deploy Enterprise
+
+A pasta `deploy/` concentra os esforços recentes para provisionar o SPECTRE_GRID como um sistema contínuo em ambientes de produção.
+* **Systemd Services:** Contém unidades do Linux (`spectre-api.service`, `spectre-fusion.service`, `spectre-web.service`) que isolam e executam as camadas do sistema nativamente em background como *daemons*.
+* **Automação:** O script `install_services.sh` garante uma instalação e orquestração limpa.
+
+---
+
+## 6. Regras de Safe Deploy e Operações do Repositório
 
 Conforme as restrições documentadas nos arquivos `project_state.md` e `fusion_changelog.md`:
 

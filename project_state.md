@@ -10,7 +10,7 @@ Sistema de Detecção de Intrusão (IDS) Híbrido focado em ameaças avançadas 
 4. **Classificador:** Camada Linear com `BCEWithLogitsLoss` e compensação de desbalanceamento (`pos_weight`).
 
 ## Pipeline de Dados
-- **Dataset Base:** NSL-KDD (pré-processado).
+- **Dataset Base:** Originalmente NSL-KDD (pré-processado), migrado para **CIC-IDS2017 Full Processed** na versão final (v1.1).
 - **Engenharia:** One-Hot Encoding e Normalização StandardScaler.
 - **Seleção:** Top-20 Features via Correlação de Pearson.
 - **Input Shape:** `[Nodes, Seq_Len=10, Features=20]`.
@@ -19,10 +19,12 @@ Sistema de Detecção de Intrusão (IDS) Híbrido focado em ameaças avançadas 
 - [x] Pipeline de treino validado (GPU Tesla T4).
 - [x] Pesos salvos em `trained_super_ids_model.pt`.
 - [x] F1-Score: 1.0 (Ambiente de teste/dummy).
+- [x] Criação de serviços Systemd para ambiente Enterprise.
+- [x] Implementação de IPC Unix Sockets concluída.
 
 ## Codename e Regras Operacionais
 - **Codename do modelo:** `SPECTRE_GRID`
-- **Compatibilidade:** Nome canónico consolidado como `SPECTRE_GRID` em toda a base de código.
+- **Compatibilidade:** `Super_IDS_Net` permanece como alias interno para integração legada.
 - **Operação de alteração:** `model.py` e `train.py` só devem ser modificados com aprovação explícita do usuário.
 - **Validação:** Toda mudança no motor nativo deve ser documentada em `cross_validation_report.md`.
 

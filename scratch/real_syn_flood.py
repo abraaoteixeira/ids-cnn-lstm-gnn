@@ -3,7 +3,7 @@ import time
 import sys
 
 def run_flood():
-    target_ip = "192.168.100.5" # IP do WSL / Windows
+    target_ip = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
     target_port = 80            # Porta alvo
     
     print(f"=== INICIANDO ATAQUE REAL (TCP SYN FLOOD SIMULADO EM SOCKET) ===")

@@ -8,7 +8,7 @@ Este documento descreve as quatro fases de evolução arquitetural projetadas pa
 
 | Fase | Tecnologia Central | Foco de Melhoria | Status |
 | :--- | :--- | :--- | :--- |
-| **Fase 1** | Unix Domain Sockets (IPC) | Eliminação de I/O de disco no fluxo crítico em tempo real. | **EM EXECUÇÃO** |
+| **Fase 1** | Unix Domain Sockets (IPC) | Eliminação de I/O de disco no fluxo crítico em tempo real. | **CONCLUÍDO** |
 | **Fase 2** | eBPF Ring Buffer (`BPF_MAP_TYPE_RINGBUF`) | Eliminar CPU Polling (transição para modelo orientado a eventos). | *Planejado* |
 | **Fase 3** | Multi-Threading C++ (Data/Control Planes) | Isolar o loop de captura de pacotes da inferência de IA. | *Planejado* |
 | **Fase 4** | D3-Force / WebGL Rendering (PixiJS) | Descarregar e otimizar a visualização de grafos sob estresse. | *Planejado* |
@@ -56,3 +56,13 @@ Este documento descreve as quatro fases de evolução arquitetural projetadas pa
   Substituir os loops manuais do `app.js` pela biblioteca matemática otimizada **D3-Force** (executando cálculos de layout em Web Workers paralelos) e usar um motor gráfico acelerado por GPU via WebGL (ex: **PixiJS** ou **Cytoscape.js**).
 * **Benefício Técnico (Porquê):**
   Estabilidade geométrica do grafo (nós não sofrem *jittering* ou oscilação infinita) e renderização suave a 60 FPS estáveis mesmo com centenas de conexões simultâneas piscando no painel.
+
+---
+
+### 5. Evolução dos Dados (Dataset)
+* **Como funcionava (Antes):**
+  O projeto foi inicialmente embasado no dataset **NSL-KDD** (pré-processado).
+* **Como funciona (Hoje/Versão 1.1):**
+  Migração completa do pipeline de dados para processamento in-memory em pandas com o dataset **CIC-IDS2017 Full Processed**.
+* **Benefício Técnico (Porquê):**
+  Acompanha a otimização de latência do sistema eBPF expondo a rede a vetores de ataques complexos, modernos e massivos que não existiam em bases de dados legadas.
