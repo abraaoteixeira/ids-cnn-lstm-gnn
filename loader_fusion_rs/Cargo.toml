@@ -1,0 +1,14 @@
+[package]
+name = "spectre_loader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libbpf-rs = "0.22"
+tch = "0.14.0" # Bindings do LibTorch
+tokio = { version = "1.35", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+lazy_static = "1.4"
+libc = "0.2"
+unix-socket = "0.5.0"

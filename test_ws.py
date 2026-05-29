@@ -3,7 +3,7 @@ import websockets
 import sys
 
 async def main():
-    uri = "ws://127.0.0.1:8000/ws/threats"
+    uri = "ws://127.0.0.1:8002/ws/threats"
     print(f"Connecting to {uri}...")
     try:
         async with websockets.connect(uri) as websocket:

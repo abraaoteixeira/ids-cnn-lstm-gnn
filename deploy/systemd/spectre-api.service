@@ -6,7 +6,7 @@ After=network.target spectre-fusion.service
 Type=simple
 User=abras
 WorkingDirectory=/home/abras/ids-cnn-lstm-gnn
-ExecStart=/home/abras/ids-cnn-lstm-gnn/.venv_wsl/bin/uvicorn dashboard_api:app --host 0.0.0.0 --port 8000
+ExecStart=/home/abras/ids-cnn-lstm-gnn/.venv_wsl/bin/uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8001
 Restart=on-failure
 RestartSec=5
 

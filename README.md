@@ -38,9 +38,9 @@ graph LR
 
     subgraph Control Plane [Control Plane & Telemetria]
         I(IPC Unix Domain Socket)
-        J(FastAPI Server: dashboard_api.py):::api
-        L[(SQLite: spectre_history.db)]:::api
-        K[Dashboard Topology: app.js]:::view
+        J(FastAPI Server: dashboard_api_v2.py / Go Server):::api
+        L[(SQLite: spectre_history_v2.db)]:::api
+        K[Dashboard Topology: App.jsx / WebGL]:::view
     end
 
     A[Tráfego de Rede] -->|Filtro de Driver| B
@@ -63,15 +63,16 @@ graph LR
 *   **eBPF / XDP (`ebpf/spectre_xdp.c`):** Injeta um programa C compilado para bytecode diretamente no driver da placa de rede. Se o IP de origem estiver no mapa hash `block_map`, o pacote é descartado (`XDP_DROP`) com latência na casa dos nanossegundos, blindando o sistema operacional antes de subir para a pilha TCP/IP convencional.
 *   **LRU Maps (`flow_map`):** Consolida contadores estatísticos em tempo real (bytes, pacotes, flags SYN, ACK, FIN, RST) associados a uma chave identificadora única de fluxo (5-tuple).
 
-### 2. User Space Daemon (Nativo C++)
-*   **Motor de Fusão (`ebpf/loader_fusion.cpp`):** Escrito em C++17, lê periodicamente o `flow_map` do kernel sem realizar alocações dinâmicas de memória (Heap Zero-Allocation).
+### 2. User Space Daemon (Nativo C++ / Rust)
+*   **Motor de Fusão C++ (`ebpf/loader_fusion_v2.cpp`):** Escrito em C++17 com suporte multi-thread, lê do Ring Buffer e alimenta a inferência da LibTorch.
+*   **Alternativa em Rust (`loader_fusion_rs/src/main.rs`):** Implementação concorrente com Tokio e bindings `tch-rs` para LibTorch.
 *   **Normalização Estática (Welford):** Utiliza médias e desvios padrão dinâmicos calculados online para estabilizar tensores.
-*   **Inference Engine (LibTorch):** Carrega o modelo compilado em TorchScript (`spectre_model_scripted.pt`), monta o grafo de relacionamento e executa a inferência relacional da STGNN de forma síncrona.
+*   **Inference Engine (LibTorch):** Carrega o modelo compilado em TorchScript (`spectre_model_scripted.pt`), monta o grafo de relacionamento e executa a inferência relacional da STGNN.
 
-### 3. Control Plane & UI (FastAPI & HTML5 Canvas)
-*   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco removendo arquivos de log intermediários da rota crítica. O Daemon C++ transmite os JSONs diretamente para a memória RAM da API FastAPI ([dashboard_api.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_api.py)).
-*   **Dashboard Web Premium (`static/app.js`):** Um motor de física de grafos direcionados (*Force-Directed Graph Layout*) renderiza os nós (IPs) e arestas (conexões) no Canvas HTML5 com regras físicas anti-aglomeração sob ataques de negação de serviço.
-*   **SQLite Storage (`spectre_history.db`):** Registra o histórico persistente das ameaças mitigadas no host.
+### 3. Control Plane & UI (FastAPI / Go & React WebGL)
+*   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco removendo arquivos de log intermediários. O Daemon transmite os JSONs diretamente para a memória RAM do backend FastAPI ([dashboard_api_v2.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_api_v2.py)) ou do Go Server ([main.go](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_go/main.go)).
+*   **Dashboard Web Premium (`dashboard_v2/`):** React + Vite utilizando a biblioteca `react-force-graph-2d` com aceleração WebGL para renderizar nós (IPs) e arestas (conexões) com física otimizada contra sobrecargas.
+*   **SQLite Storage (`spectre_history_v2.db`):** Registra o histórico persistente das ameaças mitigadas usando gravação assíncrona por lotes (batch inserts).
 
 ---
 
@@ -107,7 +108,9 @@ Entrada: [Nós, Seq_Len = 10, Features = 20]
 *   [inference.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/inference.py): Módulo demonstrativo de inferência com tensores dummy.
 *   [validate_parity.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/validate_parity.py): Compara a coerência de saída entre o código Python e o bytecode LibTorch C++.
 *   [main.cpp](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/main.cpp): Wrapper C++ legado para execução direta do modelo.
-*   [ebpf/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/ebpf): Códigos-fonte do driver Kernel Space (`spectre_xdp.c`) e da fusão nativa (`loader_fusion.cpp`).
+*   [ebpf/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/ebpf): Códigos-fonte do driver Kernel Space (`spectre_xdp.c`), do motor C++ v2 (`loader_fusion_v2.cpp`) e da versão legada (`loader_fusion_legacy.cpp`).
+*   [loader_fusion_rs/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/loader_fusion_rs): Implementação concorrente alternativa em Rust.
+*   [dashboard_go/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_go): Backend alternativo em Go de altíssima performance.
 *   [deploy/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/deploy): Scripts de provisionamento automatizado do Systemd daemon para Linux Enterprise.
 *   [scratch/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/scratch): Scripts utilitários de simulação contínua, estresse de rede (ex: `real_syn_flood.py`, `udp_flood.py`) e controle.
 
@@ -151,12 +154,17 @@ cmake -DCMAKE_PREFIX_PATH=/caminho/para/libtorch -DCMAKE_BUILD_TYPE=Release ..
 cmake --build .
 ```
 
-### 4. Executando o Dashboard & Control Plane (FastAPI)
+### 4. Executando o Dashboard & Control Plane (FastAPI V2 ou Go)
 ```bash
-# Iniciar o servidor FastAPI que ficará escutando o Socket IPC
-python3 dashboard_api.py
+# Iniciar o servidor FastAPI que ficará escutando o Socket IPC (Porta 8001)
+python3 dashboard_api_v2.py
 ```
-Acesse o painel web premium em seu navegador através do endereço `http://localhost:8000`.
+Ou usando a alternativa em Go:
+```bash
+cd dashboard_go
+go run main.go
+```
+Acesse o painel web premium em seu navegador através do endereço `http://localhost:8001`.
 
 ### 5. Implantação Enterprise com Systemd
 Para provisionar a solução em background em servidores de produção:

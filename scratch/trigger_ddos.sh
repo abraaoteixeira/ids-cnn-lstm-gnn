@@ -56,7 +56,8 @@ sleep 3
 
 # FASE 2: Volume Bruto de Conexões TCP (Rampa de Aceleração)
 echo "[FASE 2] -> Escalada de Conexoes TCP Rapidas"
-python3 scratch/real_syn_flood.py $TARGET_IP &
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+python3 "$SCRIPT_DIR/real_syn_flood.py" $TARGET_IP &
 PYTHON_FLOOD_PID=$!
 sleep 2
 

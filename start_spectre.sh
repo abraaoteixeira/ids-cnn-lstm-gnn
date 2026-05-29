@@ -6,7 +6,9 @@ echo "[*] Iniciando a Sequência de Ignição do SPECTRE_GRID..."
 mkdir -p data/logs
 
 # 1. Descoberta Automática da Placa de Rede
-ACTIVE_IFACE=$(ip route ls default | awk '{print $5}' | head -n 1)
+if [ -z "$ACTIVE_IFACE" ]; then
+    ACTIVE_IFACE=$(ip route ls default | awk '{print $5}' | head -n 1)
+fi
 
 # Se não achou rota padrão, tenta pegar a primeira interface física/virtual ativa que não seja loopback
 if [ -z "$ACTIVE_IFACE" ]; then
@@ -20,9 +22,9 @@ fi
 echo "[+] Interface detectada para o eBPF: $ACTIVE_IFACE"
 
 # 2. Subindo o Backend + Frontend Unificado (FastAPI) em background
-echo "[+] Levantando o Servidor Unificado FastAPI (Porta 8000)..."
+echo "[+] Levantando o Servidor Unificado FastAPI (Porta 8001)..."
 source .venv_wsl/bin/activate
-nohup uvicorn dashboard_api:app --host 0.0.0.0 --port 8000 > data/logs/api_output.log 2>&1 &
+nohup uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8001 > data/logs/api_output.log 2>&1 &
 API_PID=$!
 
 # 3. Acoplando o Motor de Fusão no Kernel (Data Plane)
@@ -38,7 +40,7 @@ sleep 1
 
 echo "======================================================"
 echo "🚀 SPECTRE_GRID TOTALMENTE OPERACIONAL!"
-echo " - Dashboard e API disponíveis em: http://localhost:8000"
+echo " - Dashboard e API disponíveis em: http://localhost:8001"
 echo " - logs salvos na pasta: ./data/logs/"
 echo " - PIDs dos processos: API/FRONT($API_PID) | MOTOR($FUSION_PID)"
 echo " - Para parar tudo, rode: kill $API_PID && sudo kill $FUSION_PID"

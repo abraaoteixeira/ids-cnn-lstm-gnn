@@ -7,6 +7,7 @@ from model import SPECTRE_GRID
 def parse_args():
     parser = argparse.ArgumentParser(description="Validar paridade entre modelo Python e TorchScript")
     parser.add_argument("--script-path", default="spectre_model_scripted.pt", help="Caminho para o modelo TorchScript")
+    parser.add_argument("--checkpoint", default="trained_super_ids_model.pt", help="Caminho para o checkpoint de pesos (.pt)")
     parser.add_argument("--seed", type=int, default=42, help="Semente determinística")
     parser.add_argument("--batch-size", type=int, default=4, help="Batch size para teste")
     parser.add_argument("--seq-len", type=int, default=10, help="Comprimento da sequência")
@@ -26,6 +27,19 @@ def main():
         raise SystemExit(f"Erro ao carregar modelo TorchScript '{args.script_path}': {e}")
 
     model = SPECTRE_GRID(num_features=args.num_features, seq_len=args.seq_len)
+    
+    if args.checkpoint:
+        import os
+        if os.path.exists(args.checkpoint):
+            print(f"[INFO] Carregando pesos do checkpoint para o modelo Python: {args.checkpoint}")
+            state = torch.load(args.checkpoint, map_location="cpu")
+            if isinstance(state, dict):
+                model.load_state_dict(state)
+            else:
+                model.load_state_dict(state.state_dict())
+        else:
+            print(f"[AVISO] Checkpoint '{args.checkpoint}' não encontrado. Usando pesos aleatórios.")
+            
     model.eval()
 
     x = torch.randn(args.batch_size, args.seq_len, args.num_features)
