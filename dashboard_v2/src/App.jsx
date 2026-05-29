@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Activity, Shield, AlertTriangle, Network, Server, Lock } from 'lucide-react';
 
@@ -172,90 +171,50 @@ function App() {
         {/* Panels Grid */}
         <div className="panels-grid">
           
-          {/* Traffic Timeseries Panel */}
+          {/* Traffic Node Graph Panel */}
           <div className="panel">
-            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Activity size={18} color="var(--accent-blue)" />
-                Tráfego de Rede & Detecção de Anomalias
-              </div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  onClick={() => setViewMode('chart')}
-                  style={{ background: viewMode === 'chart' ? 'var(--accent-blue)' : 'transparent', border: '1px solid var(--border-color)', color: '#fff', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                  Gráfico de Área
-                </button>
-                <button 
-                  onClick={() => setViewMode('graph')}
-                  style={{ background: viewMode === 'graph' ? 'var(--accent-blue)' : 'transparent', border: '1px solid var(--border-color)', color: '#fff', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                  Grafo de Nós
-                </button>
-              </div>
+            <div className="panel-header">
+              <Activity size={18} color="var(--accent-blue)" />
+              Grafo de Conexões GNN (Inteligência Artificial)
             </div>
             <div className="panel-content" style={{ position: 'relative' }}>
-              {viewMode === 'chart' ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trafficData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--accent-blue)" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="var(--accent-blue)" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorThreats" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--accent-red)" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="var(--accent-red)" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
-                    <XAxis dataKey="time" stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                    <YAxis stroke="var(--text-secondary)" fontSize={12} tickLine={false} axisLine={false} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-highlight)', borderRadius: '8px' }}
-                      itemStyle={{ color: '#fff' }}
-                    />
-                    <Area type="monotone" dataKey="traffic" stroke="var(--accent-blue)" fillOpacity={1} fill="url(#colorTraffic)" />
-                    <Area type="monotone" dataKey="threats" stroke="var(--accent-red)" fillOpacity={1} fill="url(#colorThreats)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div ref={graphContainerRef} style={{ width: '100%', height: '100%', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden' }}>
-                  {graphDimensions.width > 0 && (
-                    <ForceGraph2D
-                      graphData={graphData}
-                      width={graphDimensions.width}
-                      height={graphDimensions.height}
-                      nodeLabel="id"
-                      nodeColor={node => node.isThreat ? '#EF4444' : '#10B981'}
-                      linkColor={link => link.isThreat ? '#EF4444' : '#2563EB'}
-                      linkWidth={link => link.value}
-                      enableNodeDrag={true}
-                      enableZoomInteraction={true}
-                      nodeCanvasObject={(node, ctx, globalScale) => {
-                        const label = node.id;
-                        const fontSize = 12 / globalScale;
-                        ctx.font = `${fontSize}px var(--font-mono, monospace)`;
-                        const textWidth = ctx.measureText(label).width;
-                        const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
+              <div ref={graphContainerRef} style={{ width: '100%', height: '100%', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden' }}>
+                {graphDimensions.width > 0 && (
+                  <ForceGraph2D
+                    graphData={graphData}
+                    width={graphDimensions.width}
+                    height={graphDimensions.height}
+                    nodeLabel="id"
+                    nodeColor={node => node.isThreat ? '#EF4444' : '#10B981'}
+                    linkColor={link => link.isThreat ? '#EF4444' : '#2563EB'}
+                    linkWidth={link => link.value}
+                    enableNodeDrag={true}
+                    enableZoomInteraction={true}
+                    nodeCanvasObject={(node, ctx, globalScale) => {
+                      const label = node.id;
+                      const fontSize = 12 / globalScale;
+                      ctx.font = `${fontSize}px var(--font-mono, monospace)`;
+                      const textWidth = ctx.measureText(label).width;
+                      const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
 
-                        ctx.fillStyle = 'rgba(14, 16, 21, 0.8)';
-                        ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+                      ctx.fillStyle = 'rgba(14, 16, 21, 0.8)';
+                      ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
 
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillStyle = node.isThreat ? '#EF4444' : '#10B981';
-                        ctx.fillText(label, node.x, node.y);
+                      ctx.textAlign = 'center';
+                      ctx.textBaseline = 'middle';
+                      ctx.fillStyle = node.isThreat ? '#EF4444' : '#10B981';
+                      ctx.fillText(label, node.x, node.y);
 
-                        node.__bckgDimensions = bckgDimensions;
-                      }}
-                      nodePointerAreaPaint={(node, color, ctx) => {
-                        ctx.fillStyle = color;
-                        const bckgDimensions = node.__bckgDimensions;
-                        bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
-                      }}
-                    />
-                  )}
-                </div>
-              )}
+                      node.__bckgDimensions = bckgDimensions;
+                    }}
+                    nodePointerAreaPaint={(node, color, ctx) => {
+                      ctx.fillStyle = color;
+                      const bckgDimensions = node.__bckgDimensions;
+                      bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
 
