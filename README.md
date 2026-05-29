@@ -69,9 +69,12 @@ graph LR
 *   **Normalização Estática (Welford):** Utiliza médias e desvios padrão dinâmicos calculados online para estabilizar tensores.
 *   **Inference Engine (LibTorch):** Carrega o modelo compilado em TorchScript (`spectre_model_scripted.pt`), monta o grafo de relacionamento e executa a inferência relacional da STGNN.
 
-### 3. Control Plane & UI (FastAPI / Go & React WebGL)
+### 3. Control Plane & UI (FastAPI / Go & React Dashboard)
 *   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco removendo arquivos de log intermediários. O Daemon transmite os JSONs diretamente para a memória RAM do backend FastAPI ([dashboard_api_v2.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_api_v2.py)) ou do Go Server ([main.go](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_go/main.go)).
-*   **Dashboard Web Premium (`dashboard_v2/`):** React + Vite utilizando a biblioteca `react-force-graph-2d` com aceleração WebGL para renderizar nós (IPs) e arestas (conexões) com física otimizada contra sobrecargas.
+*   **Dashboard Web Enterprise (`dashboard_v2/`):** Interface profissional de monitoramento em tempo real inspirada nos painéis Cloudflare/Fortinet, desenvolvida com React 19, Vite e Recharts. Possui controle duplo de visualização no painel principal:
+    *   **Nível de Ameaça (GNN):** Gráfico de área que plota a probabilidade e o peso de atenção espaço-temporal calculado pelo modelo de Inteligência Artificial (STGNN), rastreando a criticidade dos pacotes.
+    *   **Grafo de Nós:** Visualização topológica 2D interativa utilizando física (`react-force-graph-2d`). Os IPs dos pacotes são desenhados diretamente como nós identificados na tela (verde para seguros, vermelho vivo para suspeitos/bloqueados), otimizados contra vazamento de memória e sobrecarga do grafo (limite de 80 nós e 150 links ativos simultâneos).
+*   **Localização Completa (PT-BR) & Identidade IFC:** Dashboard totalmente em Português do Brasil com integração oficial da logomarca do Instituto Federal Catarinense (IFC) no cabeçalho do projeto.
 *   **SQLite Storage (`spectre_history_v2.db`):** Registra o histórico persistente das ameaças mitigadas usando gravação assíncrona por lotes (batch inserts).
 
 ---
@@ -155,16 +158,34 @@ cmake --build .
 ```
 
 ### 4. Executando o Dashboard & Control Plane (FastAPI V2 ou Go)
+
+O backend em FastAPI ou Go serve automaticamente os arquivos compilados da interface React localizados em `dashboard_v2/dist`.
+
+#### Opção A: Executar a Interface Compilada (Produção)
+Para compilar a interface React e disponibilizá-la no servidor de backend:
 ```bash
-# Iniciar o servidor FastAPI que ficará escutando o Socket IPC (Porta 8001)
+# 1. Compilar o Frontend React (requer Node.js instalado)
+cd dashboard_v2
+npm install
+npm run build
+cd ..
+
+# 2. Iniciar o backend FastAPI
 python3 dashboard_api_v2.py
 ```
-Ou usando a alternativa em Go:
-```bash
-cd dashboard_go
-go run main.go
-```
 Acesse o painel web premium em seu navegador através do endereço `http://localhost:8001`.
+
+#### Opção B: Executar em Modo de Desenvolvimento (Vite Dev Server)
+Para trabalhar em alterações no código do dashboard com recarregamento rápido em tempo real (Hot Reload):
+```bash
+# 1. Iniciar o servidor FastAPI de backend
+python3 dashboard_api_v2.py
+
+# 2. Iniciar o servidor de desenvolvimento do Vite (em outro terminal)
+cd dashboard_v2
+npm run dev
+```
+Acesse o endereço exibido pelo Vite (ex: `http://localhost:5173`). O dashboard detectará e se conectará automaticamente à porta `8001` via WebSocket.
 
 ### 5. Implantação Enterprise com Systemd
 Para provisionar a solução em background em servidores de produção:
@@ -187,6 +208,7 @@ sudo systemctl start spectre-fusion spectre-api spectre-web
 | **Fase 2** | eBPF Ring Buffer | Eliminação completa do Polling do daemon C++ usando modelo Push. | **CONCLUÍDO** ✅ |
 | **Fase 3** | C++ Multi-Threading | Isolamento do plano de dados (Ring Buffer) do plano de inferência (IA). | **CONCLUÍDO** ✅ |
 | **Fase 4** | WebGL Rendering (D3-Force) | Otimização geométrica do grafo para renderização fluida a 60 FPS. | **CONCLUÍDO** ✅ |
+| **Fase 5** | Interface Fortinet/Cloudflare | Visual corporativo de rede em PT-BR com toggle dinâmico de gráficos e prevenção a memory leaks. | **CONCLUÍDO** ✅ |
 
 ---
 
