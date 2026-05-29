@@ -9,9 +9,9 @@ Este documento descreve as quatro fases de evolução arquitetural projetadas pa
 | Fase | Tecnologia Central | Foco de Melhoria | Status |
 | :--- | :--- | :--- | :--- |
 | **Fase 1** | Unix Domain Sockets (IPC) | Eliminação de I/O de disco no fluxo crítico em tempo real. | **CONCLUÍDO** |
-| **Fase 2** | eBPF Ring Buffer (`BPF_MAP_TYPE_RINGBUF`) | Eliminar CPU Polling (transição para modelo orientado a eventos). | *Planejado* |
-| **Fase 3** | Multi-Threading C++ (Data/Control Planes) | Isolar o loop de captura de pacotes da inferência de IA. | *Planejado* |
-| **Fase 4** | D3-Force / WebGL Rendering (PixiJS) | Descarregar e otimizar a visualização de grafos sob estresse. | *Planejado* |
+| **Fase 2** | eBPF Ring Buffer (`BPF_MAP_TYPE_RINGBUF`) | Eliminar CPU Polling (transição para modelo orientado a eventos). | **CONCLUÍDO** |
+| **Fase 3** | Multi-Threading C++ (Data/Control Planes) | Isolar o loop de captura de pacotes da inferência de IA. | **CONCLUÍDO** |
+| **Fase 4** | D3-Force / WebGL Rendering (D3-Force/Canvas) | Descarregar e otimizar a visualização de grafos sob estresse. | **CONCLUÍDO** |
 
 ---
 
