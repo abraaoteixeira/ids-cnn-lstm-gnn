@@ -14,14 +14,14 @@ graph TD
     B -->|Se IP na Block List| C{XDP_DROP}
     B -->|Se IP Seguro: Atualiza Métricas| D[Kernel Maps: flow_map]
     
-    E(User Space Daemon: loader_fusion) -->|Pooling de Alta Velocidade| D
+    E(User Space Daemon: loader_fusion_v2) -->|Polling de Alta Velocidade| D
     E -->|Derivação de 20 Features| F[Buffer Estático Ring Buffer]
     F -->|Inferência Condicional LibTorch| G{Decisão de Ameaça}
     G -->|Probabilidade > 95%| H[Atualiza block_map no Kernel]
-    G -->|Alertas e Telemetria| I[Logs: spectre_alerts.jsonl]
+    G -->|Alertas e Telemetria| I(IPC Unix Domain Socket)
     
-    J(FastAPI Server: dashboard_api.py) -->|Tail -f em Tempo Real| I
-    J -->|WebSockets| K[Dashboard Web Premium: app.js]
+    J(FastAPI Server: dashboard_api_v2.py / Go Server) -->|Escuta IPC| I
+    J -->|WebSockets| K[Dashboard Topology: App.jsx / WebGL]
 ```
 
 ---
@@ -49,7 +49,7 @@ Código escrito em C que é compilado para bytecode e injetado diretamente no dr
 * **Filtro Rápido:** Consulta o mapa Hash `block_map`. Se o IP de origem estiver na lista, o pacote é imediatamente descartado (`XDP_DROP`) antes de subir para a pilha de rede do Linux, neutralizando ataques com custo computacional mínimo.
 * **Agregador Estatístico:** Mantém contadores atômicos (`packets`, `bytes`, contagem de flags TCP SYN, ACK, FIN, RST) associados a uma chave de fluxo (5-tuple: IP Origem, IP Destino, Portas e Protocolo) dentro do mapa LRU `flow_map`.
 
-### B. O Motor de Fusão (`ebpf/loader_fusion.cpp`)
+### B. O Motor de Fusão (`ebpf/loader_fusion_v2.cpp`)
 Um daemon em C++ que une o eBPF à IA do LibTorch:
 * **Stack Operation (Zero Alocação Dinâmica):** Utiliza arrays estáticos no *hot loop* para evitar consumo excessivo de memória no heap.
 * **Algoritmo de Welford:** Calcula médias e desvios padrão dinâmicos (*online Z-score*) para normalizar as features antes de injetá-las no modelo.
@@ -57,11 +57,11 @@ Um daemon em C++ que une o eBPF à IA do LibTorch:
 
 ---
 
-## 4. O Visualizador e Dashboard (`dashboard_api.py` & `static/`)
+## 4. O Visualizador e Dashboard (`dashboard_api_v2.py` & `dashboard_v2/`)
 
 * **Interface Visual de Alto Padrão:** O dashboard foi desenvolvido com estética voltada à cibersegurança (modo escuro com realces neon e animações fluidas).
-* **Visualização da Topologia GNN (`app.js`):** Um motor de física de grafos direcionados (*Force-Directed Graph Layout*) renderiza os IPs como nós dinâmicos no Canvas HTML5 em tempo real. Recentemente recebeu atualizações nas regras físicas anti-aglomeração para suportar ataques massivos (ex: DDoS) sem quebra de estabilidade.
-* **Ingestão Leve e Persistência:** Utiliza WebSockets no FastAPI para telemetria ao vivo e introduz banco de dados local SQLite (`spectre_history.db`) para persistir o histórico de ameaças de longo prazo.
+* **Visualização da Topologia GNN (`App.jsx`):** Um motor de física de grafos direcionados (*Force-Directed Graph Layout*) renderiza os IPs como nós dinâmicos no Canvas HTML5 em tempo real. Recentemente recebeu atualizações nas regras físicas anti-aglomeração para suportar ataques massivos (ex: DDoS) sem quebra de estabilidade.
+* **Ingestão Leve e Persistência:** Utiliza WebSockets no FastAPI para telemetria ao vivo e introduz banco de dados local SQLite (`spectre_history_v2.db`) para persistir o histórico de ameaças de longo prazo.
 
 ---
 
