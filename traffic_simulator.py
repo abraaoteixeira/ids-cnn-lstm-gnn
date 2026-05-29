@@ -19,9 +19,11 @@ def generate_flow():
     if is_threat:
         src = random.choice([x for x in src_ips if "BOTNET" in x or "MALWARE" in x or "TOR" in x])
         prob = random.uniform(85.0, 99.9)
+        attention = random.uniform(0.7, 1.0) # High attention for threats
     else:
         src = random.choice([x for x in src_ips if "BOTNET" not in x and "MALWARE" not in x and "TOR" not in x])
         prob = random.uniform(0.1, 15.0)
+        attention = random.uniform(0.01, 0.3) # Low attention for normal traffic
         
     return {
         "flow_id": random.randint(1000, 9999),
@@ -31,19 +33,29 @@ def generate_flow():
         "protocol": random.choice(protocols),
         "probability": round(prob, 2),
         "is_threat": is_threat,
+        "attention_weight": round(attention, 3),
         "bytes": random.randint(64, 15000),
         "packets": random.randint(1, 150),
         "timestamp": datetime.now().strftime("%H:%M:%S")
     }
 
 def main():
+    import os
     print("Starting simulated live traffic generator...")
-    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    try:
-        client.connect(SOCKET_PATH)
-    except Exception as e:
-        print(f"Error: Could not connect to Unix socket {SOCKET_PATH}. {e}")
-        return
+    if os.name == 'nt':
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            client.connect(('127.0.0.1', 9000))
+        except Exception as e:
+            print(f"Error: Could not connect to TCP 127.0.0.1:9000. {e}")
+            return
+    else:
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            client.connect(SOCKET_PATH)
+        except Exception as e:
+            print(f"Error: Could not connect to Unix socket {SOCKET_PATH}. {e}")
+            return
         
     try:
         while True:

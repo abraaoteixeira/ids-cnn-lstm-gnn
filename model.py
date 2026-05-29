@@ -200,6 +200,24 @@ class SPECTRE_GRID(nn.Module):
 
         return logits
 
+    def forward_xai(self, x: torch.Tensor, edge_index: torch.Tensor) -> Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        Forward pass alternativo para XAI (eXplainable AI).
+        Retorna os logits e os pesos de atenção do GATConv para o Dashboard visualizar.
+        """
+        x_cnn = x.transpose(1, 2)
+        cnn_out = self.cnn(x_cnn)
+        cnn_out_transpose = cnn_out.transpose(1, 2)
+        lstm_out, (h_n, c_n) = self.lstm(cnn_out_transpose)
+        h_last = h_n[-1]
+        
+        # O pulo do gato do XAI: return_attention_weights=True
+        # Retorna: gat_out, (edge_index, attention_weights)
+        gat_out, attention = self.gat(h_last, edge_index, return_attention_weights=True)
+        
+        logits = self.classifier(gat_out).squeeze(-1)
+        return logits, attention
+
 
 if __name__ == "__main__":
     """
