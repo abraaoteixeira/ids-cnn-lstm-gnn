@@ -487,7 +487,7 @@ function App() {
                       graphData={graphData}
                       width={graphDimensions.width}
                       height={graphDimensions.height}
-                      nodeLabel="id"
+                      nodeLabel={node => node.id.split(' ')[0]}
                       nodeColor={node => node.isThreat ? '#EF4444' : '#10B981'}
                       linkColor={link => link.isThreat ? '#EF4444' : '#2563EB'}
                       linkWidth={link => link.value}
@@ -495,7 +495,7 @@ function App() {
                       enableZoomInteraction={true}
                       onNodeClick={node => setSelectedNode(node)}
                       nodeCanvasObject={(node, ctx, globalScale) => {
-                        const label = node.id;
+                        const label = node.id.split(' ')[0]; // Exibe apenas o IP limpo no grafo para UX mais limpa
                         const fontSize = 12 / globalScale;
                         ctx.font = `${fontSize}px var(--font-mono, monospace)`;
                         const textWidth = ctx.measureText(label).width;
