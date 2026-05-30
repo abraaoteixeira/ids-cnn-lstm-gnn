@@ -24,10 +24,25 @@ function App() {
   const linksMap = useRef(new Map());
   
   const wsRef = useRef(null);
+  const fgRef = useRef(null);
   
   // Referência para o container do Graph para ser responsivo
   const graphContainerRef = useRef(null);
   const [graphDimensions, setGraphDimensions] = useState({ width: 600, height: 400 });
+
+  // Configuração das forças do D3 no Grafo para evitar deriva e sobreposição
+  useEffect(() => {
+    if (fgRef.current) {
+      // Repulsão equilibrada entre os nós para evitar que saiam voando
+      fgRef.current.d3Force('charge').strength(-120);
+      // Distância média controlada para que os links não fiquem gigantescos
+      fgRef.current.d3Force('link').distance(65);
+      // Centralização firme no meio do painel
+      fgRef.current.d3Force('center')
+        .x(graphDimensions.width / 2)
+        .y(graphDimensions.height / 2);
+    }
+  }, [graphDimensions, viewMode]);
 
   // === NOVOS ESTADOS DA POC ===
   const [selectedNode, setSelectedNode] = useState(null);
@@ -443,6 +458,7 @@ function App() {
                 <div ref={graphContainerRef} style={{ width: '100%', height: '100%', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
                   {graphDimensions.width > 0 && (
                     <ForceGraph2D
+                      ref={fgRef}
                       graphData={graphData}
                       width={graphDimensions.width}
                       height={graphDimensions.height}
@@ -453,6 +469,16 @@ function App() {
                       enableNodeDrag={true}
                       enableZoomInteraction={true}
                       onNodeClick={node => setSelectedNode(node)}
+                      onEngineTick={() => {
+                        // Bounding box: Limita os nós para não escaparem do contêiner físico
+                        const padding = 30;
+                        graphData.nodes.forEach(node => {
+                          if (node.x < padding) node.x = padding;
+                          if (node.x > graphDimensions.width - padding) node.x = graphDimensions.width - padding;
+                          if (node.y < padding) node.y = padding;
+                          if (node.y > graphDimensions.height - padding) node.y = graphDimensions.height - padding;
+                        });
+                      }}
                       nodeCanvasObject={(node, ctx, globalScale) => {
                         const label = node.id;
                         const fontSize = 12 / globalScale;
