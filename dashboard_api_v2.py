@@ -44,9 +44,17 @@ async def init_db():
                 probability REAL,
                 is_threat INTEGER,
                 bytes INTEGER,
-                packets INTEGER
+                packets INTEGER,
+                attention_weight REAL DEFAULT 0.0
             )
         """)
+        # Safe migration for existing databases
+        try:
+            await db.execute("ALTER TABLE threat_log ADD COLUMN attention_weight REAL DEFAULT 0.0")
+            await db.commit()
+            logger.info("Migração: Coluna 'attention_weight' adicionada com sucesso.")
+        except sqlite3.OperationalError:
+            pass # Column already exists
         await db.commit()
     logger.info("Base de dados aiosqlite 'spectre_history_v2.db' inicializada.")
 
@@ -68,8 +76,8 @@ async def db_writer_worker():
 
                 # Transação em Lote Otimizada
                 await db.executemany("""
-                    INSERT INTO threat_log (timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO threat_log (timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets, attention_weight)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, items)
                 await db.commit()
 
@@ -102,7 +110,8 @@ async def handle_unix_client(reader, writer):
                         payload.get("probability", 0.0),
                         1 if payload.get("is_threat", False) else 0,
                         payload.get("bytes", 0),
-                        payload.get("packets", 0)
+                        payload.get("packets", 0),
+                        payload.get("attention_weight", 0.0)
                     )
                     
                     # Se a fila estiver cheia, descarta log no BD mas não derruba socket (Backpressure protection)
@@ -191,7 +200,7 @@ async def get_history(limit: int = 50, only_threats: bool = False):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
-            query = "SELECT timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets FROM threat_log"
+            query = "SELECT timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets, attention_weight FROM threat_log"
             if only_threats:
                 query += " WHERE is_threat = 1"
             query += " ORDER BY id DESC LIMIT ?"
