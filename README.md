@@ -2,7 +2,7 @@
   <img src="./logo-ifc.png" alt="IFC Logo" width="130" />
 </p>
 
-<h1 align="center">⚡ SPECTRE GRID // ENTERPRISE NGFW</h1>
+<h1 align="center">⚡ SPECTRE GRID</h1>
 <p align="center"><strong>Next-Generation Firewall & Intrusion Detection System Híbrido baseado em eBPF/XDP e Deep Learning STGNN</strong></p>
 
 <p align="center">
