@@ -85,6 +85,26 @@ graph LR
 
 ---
 
+## 🖥️ Demonstração Visual do Dashboard
+
+O painel de controle do **SPECTRE_GRID** fornece visibilidade sob as inferências de rede e auditoria do raciocínio da inteligência artificial (XAI - Explainable AI) através de uma interface integrada:
+
+### 1. Gráficos de Telemetria & HUD de Auditoria de IA (XAI)
+Na visualização **Nível de Ameaça (GNN)**, o analista monitora gráficos de probabilidade contra pesos de atenção e audita diagnósticos da GPU/CPU em tempo real (latência, fluxo de dados pelo pipeline neural e IP focado pela atenção).
+
+<p align="center">
+  <img src="./docs/assets/dashboard_xai_hud.png" alt="Dashboard Principal e HUD de Diagnósticos XAI" width="900" />
+</p>
+
+### 2. Mapeamento Topológico de Conexões (Grafo Relacional)
+Na visualização **Grafo de Nós**, o sistema renderiza a topologia de conexões de forma geométrica de fluxo, facilitando a identificação imediata de IPs suspeitos (nós vermelhos correspondentes a ameaças mitigadas e bloqueadas no driver eBPF).
+
+<p align="center">
+  <img src="./docs/assets/network_graph.png" alt="Topologia de Rede Relacional" width="900" />
+</p>
+
+---
+
 ## 🧠 Arquitetura de Inteligência Artificial: STGNN
 
 O modelo **STGNN** (Space-Temporal Graph Neural Network) foi treinado e validado com o dataset industrial **CIC-IDS2017 Full Processed** (v1.1) e segue a seguinte estrutura:
@@ -215,6 +235,7 @@ sudo systemctl start spectre-fusion spectre-api spectre-web
 | **Fase 3** | C++ Multi-Threading | Isolamento do plano de dados (Ring Buffer) do plano de inferência (IA). | **CONCLUÍDO** ✅ |
 | **Fase 4** | WebGL Rendering (D3-Force) | Otimização geométrica do grafo para renderização fluida a 60 FPS. | **CONCLUÍDO** ✅ |
 | **Fase 5** | Interface Fortinet/Cloudflare | Visual corporativo de rede em PT-BR com toggle dinâmico de gráficos e prevenção a memory leaks. | **CONCLUÍDO** ✅ |
+| **Fase 6** | Auditoria XAI & Persistência GNN | Persistência de pesos de atenção GNN no SQLite e painel split-screen de auditoria de latência e pipeline. | **CONCLUÍDO** ✅ |
 
 ---
 
