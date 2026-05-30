@@ -1,11 +1,17 @@
-# ⚡ SPECTRE_GRID
+<p align="center">
+  <img src="./logo-ifc.png" alt="IFC Logo" width="130" />
+</p>
 
-[![OS - Linux / WSL2](https://img.shields.io/badge/OS-Linux%20%2F%20WSL2-blue?style=for-the-badge&logo=linux&logoColor=white)](https://ubuntu.com/)
-[![Kernel - eBPF / XDP](https://img.shields.io/badge/Kernel-eBPF%20%2F%20XDP-orange?style=for-the-badge&logo=linux-foundation&logoColor=white)](https://ebpf.io/)
-[![AI - STGNN (PyG)](https://img.shields.io/badge/AI-STGNN%20(PyG)-red?style=for-the-badge&logo=pytorch&logoColor=white)](https://pytorch.org/geometric/html/index.html)
-[![Core - C++17 / LibTorch](https://img.shields.io/badge/Core-C%2B%2B17%20%2F%20LibTorch-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white)](https://pytorch.org/cppdocs/)
-[![Control Plane - FastAPI](https://img.shields.io/badge/Control_Plane-FastAPI%20%2F%20WebSockets-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Storage - SQLite](https://img.shields.io/badge/Storage-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+<h1 align="center">⚡ SPECTRE GRID // ENTERPRISE NGFW</h1>
+<p align="center"><strong>Next-Generation Firewall & Intrusion Detection System Híbrido baseado em eBPF/XDP e Deep Learning STGNN</strong></p>
+
+<p align="center">
+  <a href="https://ubuntu.com/"><img src="https://img.shields.io/badge/OS-Linux%20%2F%20WSL2-blue?style=for-the-badge&logo=linux&logoColor=white" /></a>
+  <a href="https://ebpf.io/"><img src="https://img.shields.io/badge/Kernel-eBPF%20%2F%20XDP-orange?style=for-the-badge&logo=linux-foundation&logoColor=white" /></a>
+  <a href="https://pytorch.org/geometric/html/index.html"><img src="https://img.shields.io/badge/AI-STGNN%20(PyG)-red?style=for-the-badge&logo=pytorch&logoColor=white" /></a>
+  <a href="https://pytorch.org/cppdocs/"><img src="https://img.shields.io/badge/Core-C%2B%2B17%20%2F%20LibTorch-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" /></a>
+  <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Control_Plane-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" /></a>
+</p>
 
 O **SPECTRE_GRID** é um ecossistema industrial de Detecção e Prevenção de Intrusão (IDS/IPS) híbrido e de alta performance. O sistema foi desenvolvido para monitorar movimentações laterais, varreduras de portas e ataques complexos (como DDoS) em tempo real, integrando filtros em nível de driver de rede (**eBPF/XDP**) com inteligência artificial geométrica espaço-temporal (**STGNN**).
 
@@ -72,7 +78,7 @@ graph LR
 ### 3. Control Plane & UI (FastAPI / Go & React Dashboard)
 *   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco removendo arquivos de log intermediários. O Daemon transmite os JSONs diretamente para a memória RAM do backend FastAPI ([dashboard_api_v2.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_api_v2.py)) ou do Go Server ([main.go](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_go/main.go)).
 *   **Dashboard Web Enterprise (`dashboard_v2/`):** Interface profissional de monitoramento em tempo real inspirada nos painéis Cloudflare/Fortinet, desenvolvida com React 19, Vite e Recharts. Possui controle duplo de visualização no painel principal:
-    *   **Nível de Ameaça (GNN):** Gráfico de área que plota a probabilidade e o peso de atenção espaço-temporal calculado pelo modelo de Inteligência Artificial (STGNN), rastreando a criticidade dos pacotes.
+    *   **Nível de Ameaça (GNN) & Auditoria XAI:** Gráfico de área que plota a probabilidade de intrusão e os pesos de atenção espaço-temporal em tempo real, acompanhado por um **Módulo de Auditoria de IA (XAI)** em split-screen. O HUD lateral exibe latência de inferência espaço-temporal dinâmica, classificação de criticidade (BAIXO, MÉDIO, ALTO, CRÍTICO), o IP de foco da atenção GNN e o pipeline neural interativo.
     *   **Grafo de Nós:** Visualização topológica 2D interativa utilizando física (`react-force-graph-2d`). Os IPs dos pacotes são desenhados diretamente como nós identificados na tela (verde para seguros, vermelho vivo para suspeitos/bloqueados), otimizados contra vazamento de memória e sobrecarga do grafo (limite de 80 nós e 150 links ativos simultâneos).
 *   **Localização Completa (PT-BR) & Identidade IFC:** Dashboard totalmente em Português do Brasil com integração oficial da logomarca do Instituto Federal Catarinense (IFC) no cabeçalho do projeto.
 *   **SQLite Storage (`spectre_history_v2.db`):** Registra o histórico persistente das ameaças mitigadas usando gravação assíncrona por lotes (batch inserts).
