@@ -103,7 +103,8 @@ function App() {
             if (!nodesMap.current.has(srcIp)) nodesMap.current.set(srcIp, { id: srcIp, isThreat });
             if (!nodesMap.current.has(dstIp)) nodesMap.current.set(dstIp, { id: dstIp, isThreat });
             
-            const linkId = `${srcIp}-${dstIp}`;
+            // Link ID bidirecional (independente de origem/destino) para evitar arestas duplicadas
+            const linkId = srcIp < dstIp ? `${srcIp}-${dstIp}` : `${dstIp}-${srcIp}`;
             if (!linksMap.current.has(linkId)) {
               linksMap.current.set(linkId, {
                 source: srcIp,
@@ -111,6 +112,10 @@ function App() {
                 value: isThreat ? 3 : 1,
                 isThreat: isThreat
               });
+            } else if (isThreat) {
+              const existingLink = linksMap.current.get(linkId);
+              existingLink.isThreat = true;
+              existingLink.value = 3;
             }
 
             return { ...item, timestamp };
@@ -119,7 +124,11 @@ function App() {
           setLogs(formatted);
           setGraphData({
             nodes: Array.from(nodesMap.current.values()),
-            links: Array.from(linksMap.current.values())
+            links: Array.from(linksMap.current.values()).map(link => ({
+              ...link,
+              source: typeof link.source === 'object' ? link.source.id : link.source,
+              target: typeof link.target === 'object' ? link.target.id : link.target
+            }))
           });
 
           // Computar stats iniciais baseados no histórico
@@ -198,15 +207,21 @@ function App() {
           linksMap.current.delete(firstLinkKey);
         }
 
-        // Se o IP for ameaça, sobrescreve o status
-        if (!nodesMap.current.has(srcIp) || isThreat) {
-          nodesMap.current.set(srcIp, { id: srcIp, isThreat: isThreat || (nodesMap.current.get(srcIp)?.isThreat || false) });
+        // Se o IP for ameaça, atualiza a propriedade do nó existente sem recriar o objeto
+        if (!nodesMap.current.has(srcIp)) {
+          nodesMap.current.set(srcIp, { id: srcIp, isThreat: isThreat });
+        } else if (isThreat) {
+          nodesMap.current.get(srcIp).isThreat = true;
         }
-        if (!nodesMap.current.has(dstIp) || isThreat) {
-          nodesMap.current.set(dstIp, { id: dstIp, isThreat: isThreat || (nodesMap.current.get(dstIp)?.isThreat || false) });
+
+        if (!nodesMap.current.has(dstIp)) {
+          nodesMap.current.set(dstIp, { id: dstIp, isThreat: isThreat });
+        } else if (isThreat) {
+          nodesMap.current.get(dstIp).isThreat = true;
         }
         
-        const linkId = `${srcIp}-${dstIp}`;
+        // Link ID bidirecional para evitar arestas duplicadas
+        const linkId = srcIp < dstIp ? `${srcIp}-${dstIp}` : `${dstIp}-${srcIp}`;
         if (!linksMap.current.has(linkId)) {
           linksMap.current.set(linkId, {
             source: srcIp,
@@ -214,11 +229,21 @@ function App() {
             value: isThreat ? 3 : 1,
             isThreat: isThreat
           });
+        } else {
+          const existingLink = linksMap.current.get(linkId);
+          if (isThreat) {
+            existingLink.isThreat = true;
+            existingLink.value = 3;
+          }
         }
 
         setGraphData({
           nodes: Array.from(nodesMap.current.values()),
-          links: Array.from(linksMap.current.values())
+          links: Array.from(linksMap.current.values()).map(link => ({
+            ...link,
+            source: typeof link.source === 'object' ? link.source.id : link.source,
+            target: typeof link.target === 'object' ? link.target.id : link.target
+          }))
         });
 
         // Dispara Toast de Alerta caso seja Ameaça detectada pela IA
@@ -469,16 +494,6 @@ function App() {
                       enableNodeDrag={true}
                       enableZoomInteraction={true}
                       onNodeClick={node => setSelectedNode(node)}
-                      onEngineTick={() => {
-                        // Bounding box: Limita os nós para não escaparem do contêiner físico
-                        const padding = 30;
-                        graphData.nodes.forEach(node => {
-                          if (node.x < padding) node.x = padding;
-                          if (node.x > graphDimensions.width - padding) node.x = graphDimensions.width - padding;
-                          if (node.y < padding) node.y = padding;
-                          if (node.y > graphDimensions.height - padding) node.y = graphDimensions.height - padding;
-                        });
-                      }}
                       nodeCanvasObject={(node, ctx, globalScale) => {
                         const label = node.id;
                         const fontSize = 12 / globalScale;
