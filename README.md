@@ -28,38 +28,51 @@ graph LR
     classDef daemon fill:#69c,stroke:#333,stroke-width:2px;
     classDef api fill:#4db6ac,stroke:#333,stroke-width:2px;
     classDef view fill:#ff8a80,stroke:#333,stroke-width:2px;
+    classDef heur fill:#b39ddb,stroke:#333,stroke-width:2px;
 
     subgraph Kernel Space [Kernel Space - eBPF / XDP]
         B(Kernel space: eBPF / XDP prog):::kernel
         C{XDP_DROP}:::kernel
         D[Kernel LRU Map: flow_map]:::kernel
+        W[BPF Hash: whitelist_map]:::kernel
     end
 
-    subgraph User Space [User Space Daemon]
-        E(loader_fusion Daemon):::daemon
-        F[Ring Buffer: Shape 10x20]:::daemon
-        G{Decisão de Ameaça}:::daemon
-        H[block_map Updater]:::daemon
+    subgraph VPS GCP [VPS GCP - sensor_ebpf.py]
+        E(sensor_ebpf.py Python Daemon):::daemon
+        Z[ZeroMQ PUSH tcp:5555]:::daemon
+    end
+
+    subgraph WSL [WSL2 - receiver_gnn.py]
+        R(receiver_gnn.py):::daemon
+        FE[Feature Engineering Online]:::daemon
+        STGNN[STGNN TorchScript Inference]:::daemon
+        HEUR[Heurística de Segurança]:::heur
+        ENS{Ensemble: max score}:::daemon
+        BAN[ZeroMQ PUB BAN_IP tcp:5556]:::daemon
     end
 
     subgraph Control Plane [Control Plane & Telemetria]
         I(IPC Unix Domain Socket)
-        J(FastAPI Server: dashboard_api_v2.py / Go Server):::api
+        J(FastAPI: dashboard_api_v2.py):::api
         L[(SQLite: spectre_history_v2.db)]:::api
-        K[Dashboard Topology: App.jsx / WebGL]:::view
+        K[Dashboard React + Globe 3D]:::view
     end
 
-    A[Tráfego de Rede] -->|Filtro de Driver| B
+    A[Tráfego de Rede] -->|Filtro XDP| B
     B -->|IP na Blacklist| C
-    B -->|IP Seguro: Métricas| D
-    
-    D -->|Leitura Atômica| E
-    E -->|Welford Z-Score| F
-    F -->|Inferência LibTorch| G
-    G -->|Probabilidade > 95%| H
-    H -->|Mitigação Atômica| B
-    G -->|Alerta / Telemetria| I
-    
+    B -->|IP Seguro ou Whitelist| D
+    D -->|Leitura Ring Buffer| E
+    E -->|ZeroMQ PUSH| Z
+    Z -->|WireGuard VPN| R
+    R --> FE
+    FE --> STGNN
+    FE --> HEUR
+    STGNN --> ENS
+    HEUR --> ENS
+    ENS -->|prob >= 70%| BAN
+    ENS -->|Telemetria| I
+    BAN -->|ZeroMQ SUB| B
+    W -->|Nunca bane gestão| B
     I -->|Escuta IPC| J
     J -->|Persistência| L
     J -->|WebSockets Live| K
@@ -236,9 +249,37 @@ sudo systemctl start spectre-fusion spectre-api spectre-web
 | **Fase 4** | WebGL Rendering (D3-Force) | Otimização geométrica do grafo para renderização fluida a 60 FPS. | **CONCLUÍDO** ✅ |
 | **Fase 5** | Interface Fortinet/Cloudflare | Visual corporativo de rede em PT-BR com toggle dinâmico de gráficos e prevenção a memory leaks. | **CONCLUÍDO** ✅ |
 | **Fase 6** | Auditoria XAI & Persistência GNN | Persistência de pesos de atenção GNN no SQLite e painel split-screen de auditoria de latência e pipeline. | **CONCLUÍDO** ✅ |
+| **Fase 7** | Ensemble STGNN + Heurística (Active IPS) | Integração da inferência STGNN real (TorchScript) com camada heurística de segurança. Whitelist BPF, Active Learning JSONL, Globo 3D de ataques. | **CONCLUÍDO** ✅ |
 
 ---
 
 ## 🏛️ Contexto Acadêmico
 
 O **SPECTRE_GRID** é parte do projeto de pesquisa em cibersegurança e redes inteligentes desenvolvido no **IFC Brusque**. O projeto iniciou usando amostras do dataset NSL-KDD e evoluiu para o CIC-IDS2017 para refletir as necessidades de detecção contra vetores de ataques de próxima geração. O histórico completo de iterações do Git e análises estruturais de pesquisa estão consolidados no arquivo [research_history_log.md](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/research_history_log.md).
+
+---
+
+## 📊 Resultados Empíricos: Honeypot em Produção
+
+A VPS GCP (IP público exposto) operou como **honeypot** captando ataques reais da internet durante o período de validação. Dados coletados pelo `sensor_ebpf.py` e processados pelo `receiver_gnn.py` com o Ensemble STGNN:
+
+| Métrica | Valor |
+| :--- | :--- |
+| **Total de Eventos Capturados** | 366 |
+| **Ameaças Detectadas e Bloqueadas** | 202 (55.2%) |
+| **IPs Atacantes Únicos** | 27 |
+| **Porta Mais Atacada** | :22 SSH (165 tentativas) |
+| **País de Maior Origem** | EUA (34 eventos externos) |
+| **RDP (Porta 3389)** | 5 tentativas de países como Bulgária e Vietnã |
+
+### Top Países de Origem de Ataques
+
+| País | Eventos |
+| :--- | :--- |
+| Estados Unidos | 34 |
+| Alemanha | 17 |
+| Bulgária | 4 |
+| Vietnã | 3 |
+| República da Coreia | 3 |
+
+> **Nota:** Os eventos com IP `177.5.130.126 (Brasil/Palhoça)` correspondem ao desenvolvedor acessando a VPS via SSH — corretamente protegido pela whitelist BPF e nunca banido.

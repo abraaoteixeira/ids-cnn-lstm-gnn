@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine, Legend } from 'recharts';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Activity, Shield, AlertTriangle, Network, Server, Lock, Search, Trash2, Download, X, HelpCircle } from 'lucide-react';
+import Globe from 'react-globe.gl';
+import { Activity, Shield, AlertTriangle, Network, Server, Lock, Search, Trash2, Download, X, HelpCircle, Globe as GlobeIcon } from 'lucide-react';
 
 function App() {
   const [logs, setLogs] = useState([]);
@@ -16,7 +17,9 @@ function App() {
   const [trafficData, setTrafficData] = useState([]);
   
   // View mode para alternar entre AreaChart e Graph
-  const [viewMode, setViewMode] = useState('chart'); // 'chart' ou 'graph'
+  const [viewMode, setViewMode] = useState('chart'); // 'chart', 'graph' ou 'globe'
+  const [globeArcs, setGlobeArcs] = useState([]);  // Arcos de ataque para o Globo 3D
+  const globeRef = useRef(null);
   
   // Dados do Force Graph
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
@@ -126,7 +129,13 @@ function App() {
               existingLink.value = 3;
             }
 
-            return { ...item, timestamp };
+            // Fix timestamp for the table view as well
+            let finalTimestamp = timestamp;
+            if (finalTimestamp.includes('T')) {
+                finalTimestamp = new Date(finalTimestamp).toLocaleTimeString('en-US', { hour12: false });
+            }
+
+            return { ...item, timestamp: finalTimestamp };
           });
 
           setLogs(formatted);
@@ -141,11 +150,15 @@ function App() {
 
           // Pre-popula os últimos 30 pontos de tráfego com o histórico do BD para o gráfico
           const initialTraffic = data.slice(0, 30).reverse().map(item => {
-            const t = item.timestamp || new Date().toLocaleTimeString('en-US', { hour12: false });
+            let t = item.timestamp || new Date().toLocaleTimeString('en-US', { hour12: false });
+            // Convert ISO string to HH:MM:SS format to match WebSocket
+            if (t.includes('T')) {
+                t = new Date(t).toLocaleTimeString('en-US', { hour12: false });
+            }
             return {
               time: t,
-              maxAttention: item.attention_weight !== undefined ? item.attention_weight * 100 : (item.probability ? item.probability * 0.9 : 0),
-              maxProbability: item.probability || 0
+              maxAttention: item.attention_weight !== undefined ? item.attention_weight * 100 : (item.probability ? item.probability * 90 : 0),
+              maxProbability: item.probability ? item.probability * 100 : 0
             };
           });
           setTrafficData(initialTraffic);
@@ -200,7 +213,7 @@ function App() {
 
         // Atualiza Gráfico de Linha/Área
         const attention = (data.attention_weight || 0) * 100;
-        const probability = data.probability || 0;
+        const probability = (data.probability || 0) * 100;
         const srcIp = data.src_ip || 'Unknown';
         const cleanIp = srcIp.split(' ')[0];
 
@@ -285,10 +298,28 @@ function App() {
           }))
         });
 
+        // Alimenta o Globo 3D com arcos de ataque
+        if (data.lat && data.lon && Math.abs(data.lat) > 0.1 && data.is_threat) {
+          const newArc = {
+            id: Date.now(),
+            srcIp: data.src_ip || 'Unknown',
+            startLat: data.lat,
+            startLng: data.lon,
+            endLat: -15.77,   // Brasil - localização central da VPS GCP
+            endLng: -47.93,
+            color: ['#ef4444', '#ef4444'],
+          };
+          setGlobeArcs(prev => {
+            const updated = [...prev, newArc];
+            return updated.length > 40 ? updated.slice(-40) : updated; // max 40 arcos
+          });
+        }
+
         // Dispara Toast de Alerta caso seja Ameaça detectada pela IA
         if (isThreat) {
           addToast(`Ameaça Mitigada: Fluxo suspeito detectado de ${srcIp} para ${dstIp}`, 'danger');
         }
+
 
       } catch (err) {
         console.error("Error parsing WS message:", err);
@@ -490,6 +521,12 @@ function App() {
                   className={`btn-toggle ${viewMode === 'graph' ? 'active' : ''}`}>
                   Grafo de Nós
                 </button>
+                <button 
+                  onClick={() => setViewMode('globe')}
+                  className={`btn-toggle ${viewMode === 'globe' ? 'active' : ''}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <GlobeIcon size={14} /> Globo 3D
+                </button>
               </div>
             </div>
             <div className="panel-content" style={{ position: 'relative', overflow: 'hidden', padding: 0 }}>
@@ -602,6 +639,51 @@ function App() {
                         <div className="pipeline-node active" title="Predição de Logit">FC</div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              ) : viewMode === 'globe' ? (
+                // ── Globo 3D de Ataques em Tempo Real ────────────────────────────────
+                <div style={{ width: '100%', height: '100%', background: '#050a14', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                  <Globe
+                    ref={globeRef}
+                    width={800}
+                    height={400}
+                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
+                    backgroundColor="#050a14"
+                    atmosphereColor="#1d4ed8"
+                    atmosphereAltitude={0.15}
+                    arcsData={globeArcs}
+                    arcStartLat={d => d.startLat}
+                    arcStartLng={d => d.startLng}
+                    arcEndLat={d => d.endLat}
+                    arcEndLng={d => d.endLng}
+                    arcColor={d => d.color}
+                    arcAltitude={0.3}
+                    arcStroke={1.2}
+                    arcDashLength={0.4}
+                    arcDashGap={0.2}
+                    arcDashAnimateTime={1800}
+                    arcsTransitionDuration={300}
+                    pointsData={globeArcs}
+                    pointLat={d => d.startLat}
+                    pointLng={d => d.startLng}
+                    pointColor={d => d.color[0]}
+                    pointAltitude={0.01}
+                    pointRadius={0.4}
+                    pointsMerge={false}
+                    labelsData={globeArcs.slice(-8)}
+                    labelLat={d => d.startLat}
+                    labelLng={d => d.startLng}
+                    labelText={d => d.srcIp}
+                    labelSize={0.7}
+                    labelColor={() => '#ef4444'}
+                    labelDotRadius={0.3}
+                  />
+                  <div style={{ position: 'absolute', top: '10px', left: '10px', background: 'rgba(0,0,0,0.7)', borderRadius: '6px', padding: '8px 12px', fontSize: '0.75rem', color: '#94a3b8', backdropFilter: 'blur(4px)' }}>
+                    <div style={{ color: '#ef4444', fontWeight: 700, marginBottom: '4px' }}>🔴 Ataques em Tempo Real</div>
+                    <div>Arcos vermelhos = ameaças bloqueadas</div>
+                    <div>Destino: VPS GCP us-central1 🇧🇷</div>
+                    <div style={{ marginTop: '4px' }}>Total: <strong style={{ color: '#f8fafc' }}>{globeArcs.length}</strong> eventos</div>
                   </div>
                 </div>
               ) : (

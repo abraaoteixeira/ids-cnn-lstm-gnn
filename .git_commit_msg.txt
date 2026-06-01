@@ -1,0 +1,52 @@
+feat(spectre-v1.1): Ensemble STGNN + Heuristica, Globo 3D, Honeypot Results, Arquitetura Real
+
+BREAKING IMPROVEMENTS - receiver_gnn.py:
+- Integra inferencia STGNN real via TorchScript (spectre_model_scripted.pt)
+- Antes: probability = 0.999 hardcoded (MOCK)
+- Agora: Ensemble max(STGNN_TorchScript, Heuristica_Seguranca)
+
+Feature Engineering Online (20 features de rede em tempo real):
+- dst_port normalizado, porta de risco, protocolo, PPS, entropia de porta
+- Deteccao de port scan (>5 portas distintas), IPs RFC-1918, frequencia de ataque
+
+OnlineGraph: grafo deslizante de ate 50 nos (IPs) com janela SEQ_LEN=10
+- Atualiza edge_index a cada pacote para inferencia relacional STGNN
+
+Heuristica de Seguranca (camada complementar ao STGNN):
+- Portas criticas: RDP(3389)=85%, Telnet(23)=85%, SMB(445)=80%
+- Port scan detection: score cresce com numero de portas distintas
+- Brute force: PPS > 5 em portas sensiveis sobe score ate 95%
+- IPs RFC-1918 nunca passam de 40% (protege rede interna)
+
+Whitelist BPF: 10.0.0.2, 177.5.130.126, 80.94.92.168 nunca sao banidos
+IPS threshold: 70% (conservador, evita falsos positivos)
+
+feat(dashboard): Globo 3D de ataques em tempo real (react-globe.gl)
+- Novo toggle 'Globo 3D' no painel principal
+- Arcos vermelhos animados: pais atacante -> Brasil (VPS GCP)
+- Alimentado diretamente pelo WebSocket com dados lat/lon do GeoIP
+- Maximo de 40 arcos simultaneos (gestao de memoria)
+
+docs(readme): Arquitetura real atualizada - Fase 7 concluida
+- Diagrama Mermaid reflete pipeline Python Ensemble (nao C++ LibTorch idealizado)
+- VPS GCP sensor_ebpf.py + ZeroMQ + WireGuard + WSL receiver_gnn.py + FastAPI
+- Fase 7 adicionada ao Roadmap como CONCLUIDO
+- Secao de Resultados Empiricos do Honeypot:
+  * 366 eventos capturados, 202 ameacas bloqueadas (55.2%)
+  * 27 IPs atacantes unicos de 8 paises
+  * Top porta: SSH(22) com 165 tentativas
+  * Paises: EUA, Alemanha, Bulgaria, Vietnam, Coreia
+
+feat(honeypot): Active Learning JSONL com dados reais de ataque
+- data/honeypot_real_attacks.jsonl: todos os eventos capturados pelo honeypot
+
+feat(tests): Scripts de validacao E2E
+- test_model.py: valida carregamento e inferencia do TorchScript
+- test_e2e_stgnn.py: injeta pacotes e verifica decisoes do IPS
+- analyze_honeypot.py: estatisticas dos dados capturados
+
+Resultados dos Testes E2E:
+- Bulgaria RDP:3389 -> prob=85% -> BAN_IP (correto)
+- Google HTTP:80 -> prob=0% -> PERMITIDO (correto)
+- Vietnam SSH:22 -> prob=95% -> BAN_IP (correto)
+- IP Gestao SSH:22 -> prob=95% -> WHITELIST, nao banido (correto)
