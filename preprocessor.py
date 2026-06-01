@@ -84,6 +84,7 @@ def build_graph(
     time_col: Optional[str] = None,
     src_cols_priority: List[str] = None,
     dst_cols_priority: List[str] = None,
+    target_col: str = 'target',
 ) -> Data:
     """
     Constroi um grafo PyG com x: [num_nodes, seq_len, len(top_features)].
@@ -156,9 +157,9 @@ def build_graph(
             edge_counts[ekey] += 1
             edge_attrs[ekey] += feats
 
-            # node label: if 'target' column exists and indicates anomaly -> mark node
-            if 'target' in df_proc.columns:
-                t = _map_target_to_binary(pd.Series([row['target']])).iloc[0]
+            # node label: if target_col column exists and indicates anomaly -> mark node
+            if target_col in df_proc.columns:
+                t = _map_target_to_binary(pd.Series([row[target_col]])).iloc[0]
                 if t == 1:
                     node_labels[s_idx] = 1
                     node_labels[d_idx] = 1
@@ -210,8 +211,8 @@ def build_graph(
             feats = feat_df.loc[row.name].values.astype(np.float32)
             # place at last time step
             node_features[i, -1, :] = feats
-            if 'target' in df.columns:
-                node_labels[i] = _map_target_to_binary(pd.Series([row['target']])).iloc[0]
+            if target_col in df.columns:
+                node_labels[i] = _map_target_to_binary(pd.Series([row[target_col]])).iloc[0]
 
         # edges between consecutive nodes
         if N <= 1:
@@ -308,7 +309,7 @@ def main():
     logging.info(f'Top-20 features guardadas em {args.topk_json}')
 
     # Build graph
-    data = build_graph(df_enc, topk, seq_len=args.seq_len, time_col=args.time_col)
+    data = build_graph(df_enc, topk, seq_len=args.seq_len, time_col=args.time_col, target_col=args.target_col)
 
     # save
     out = Path(args.output_pt)
