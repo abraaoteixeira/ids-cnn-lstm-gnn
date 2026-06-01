@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./logo-ifc.png" alt="IFC Logo" width="130" />
+  <img src="https://raw.githubusercontent.com/abraaoteixeira/ids-cnn-lstm-gnn/main/logo-ifc.png" alt="IFC Logo" width="130" />
 </p>
 
 <h1 align="center">🛡️ SPECTRE GRID</h1>
@@ -14,7 +14,7 @@
   <img src="https://img.shields.io/badge/Status-Em%20Produ%C3%A7%C3%A3o-brightgreen?style=for-the-badge" />
 </p>
 
-O **SPECTRE_GRID** é um ecossistema industrial de Detecção e Prevenção de Intrusão (IDS/IPS) híbrido e de alta performance. O sistema foi desenvolvido para monitorar movimentações laterais, varreduras de portas e ataques complexos (como DDoS) em tempo real, integrando filtros em nível de driver de rede (**eBPF/XDP**) com inteligência artificial geométrica espaço-temporal (**STGNN**).
+O **SPECTRE_GRID** é um Sistema de Detecção e Prevenção de Intrusão (IDS/IPS) de alta performance desenvolvido como projeto de pesquisa no **IFC — Instituto Federal Catarinense, Campus Brusque**. O sistema monitora movimentações laterais, varreduras de portas e ataques em tempo real, integrando filtros em nível de driver de rede (**eBPF/XDP**) com inteligência artificial geométrica espaço-temporal (**STGNN**). Funciona em produção como honeypot real, com sensor eBPF rodando em VPS GCP e dashboard React em tempo real.
 
 ---
 
@@ -103,19 +103,14 @@ graph TB
 
 O painel de controle do **SPECTRE_GRID** fornece visibilidade sob as inferências de rede e auditoria do raciocínio da inteligência artificial (XAI - Explainable AI) através de uma interface integrada:
 
-### 1. Gráficos de Telemetria & HUD de Auditoria de IA (XAI)
-Na visualização **Nível de Ameaça (GNN)**, o analista monitora gráficos de probabilidade contra pesos de atenção e audita diagnósticos da GPU/CPU em tempo real (latência, fluxo de dados pelo pipeline neural e IP focado pela atenção).
+### 1. Nível de Ameaça (GNN) & HUD de Auditoria XAI
+Gráfico de área em tempo real com probabilidade de intrusão e pesos de atenção da STGNN. HUD lateral exibe latência de inferência, classificação de criticidade (BAIXO/MÉDIO/ALTO/CRÍTICO), IP focado pela atenção e pipeline neural interativo CNN-1D → LSTM → GATConv → FC.
 
-<p align="center">
-  <img src="./docs/assets/dashboard_xai_hud.png" alt="Dashboard Principal e HUD de Diagnósticos XAI" width="900" />
-</p>
+### 2. Grafo de Nós (Topologia Relacional)
+Visualizacão force-directed 2D dos IPs como nós dinâmicos: verde para tráfego seguro, vermelho para ameaças bloqueadas pelo XDP. Limite de 80 nós e 150 links ativos para estabilidade.
 
-### 2. Mapeamento Topológico de Conexões (Grafo Relacional)
-Na visualização **Grafo de Nós**, o sistema renderiza a topologia de conexões de forma geométrica de fluxo, facilitando a identificação imediata de IPs suspeitos (nós vermelhos correspondentes a ameaças mitigadas e bloqueadas no driver eBPF).
-
-<p align="center">
-  <img src="./docs/assets/network_graph.png" alt="Topologia de Rede Relacional" width="900" />
-</p>
+### 3. Globo 3D de Ataques (react-globe.gl)
+Arcos animados em tempo real mostrando a origem geográfica de cada ataque no globo terrestre com textura noturna.
 
 ---
 
