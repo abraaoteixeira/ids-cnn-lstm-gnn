@@ -9,74 +9,75 @@
   <a href="https://ubuntu.com/"><img src="https://img.shields.io/badge/OS-Linux%20%2F%20WSL2-blue?style=for-the-badge&logo=linux&logoColor=white" /></a>
   <a href="https://ebpf.io/"><img src="https://img.shields.io/badge/Kernel-eBPF%20%2F%20XDP-orange?style=for-the-badge&logo=linux-foundation&logoColor=white" /></a>
   <a href="https://pytorch.org/geometric/html/index.html"><img src="https://img.shields.io/badge/AI-STGNN%20(PyG)-red?style=for-the-badge&logo=pytorch&logoColor=white" /></a>
-  <a href="https://pytorch.org/cppdocs/"><img src="https://img.shields.io/badge/Core-C%2B%2B17%20%2F%20LibTorch-00599C?style=for-the-badge&logo=c%2B%2B&logoColor=white" /></a>
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Control_Plane-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" /></a>
+  <a href="https://wireguard.com/"><img src="https://img.shields.io/badge/VPN-WireGuard-88171A?style=for-the-badge&logo=wireguard&logoColor=white" /></a>
+  <img src="https://img.shields.io/badge/Status-Em%20Produ%C3%A7%C3%A3o-brightgreen?style=for-the-badge" />
 </p>
 
 O **SPECTRE_GRID** é um ecossistema industrial de Detecção e Prevenção de Intrusão (IDS/IPS) híbrido e de alta performance. O sistema foi desenvolvido para monitorar movimentações laterais, varreduras de portas e ataques complexos (como DDoS) em tempo real, integrando filtros em nível de driver de rede (**eBPF/XDP**) com inteligência artificial geométrica espaço-temporal (**STGNN**).
 
 ---
 
-## 📐 Arquitetura do Ecossistema
+## 📐 Arquitetura Real em Produção (01/06/2026)
 
-O sistema opera sob o modelo de **Produtor-Consumidor** de três camadas para garantir latência ultrabaixa de nível de kernel com capacidade cognitiva em tempo real:
+O sistema opera em produção com a seguinte arquitetura verificada:
 
 ```mermaid
-graph LR
-    %% Estilização
+graph TB
     classDef kernel fill:#f96,stroke:#333,stroke-width:2px;
     classDef daemon fill:#69c,stroke:#333,stroke-width:2px;
     classDef api fill:#4db6ac,stroke:#333,stroke-width:2px;
     classDef view fill:#ff8a80,stroke:#333,stroke-width:2px;
     classDef heur fill:#b39ddb,stroke:#333,stroke-width:2px;
+    classDef infra fill:#ffd54f,stroke:#333,stroke-width:2px;
 
-    subgraph Kernel Space [Kernel Space - eBPF / XDP]
-        B(Kernel space: eBPF / XDP prog):::kernel
-        C{XDP_DROP}:::kernel
-        D[Kernel LRU Map: flow_map]:::kernel
-        W[BPF Hash: whitelist_map]:::kernel
+    subgraph VPS["☁️ VPS GCP e2-micro — IP Fixo: 34.172.18.46"]
+        XDP("⚡ XDP Hook — kernel space"):::kernel
+        EBPF("🔬 sensor_ebpf.py\n[systemd: Restart=always]"):::daemon
+        WG_VPS("🔒 WireGuard wg0\n10.0.0.1:51820/UDP"):::infra
+        XDP -->|src_ip, dst_port, protocol| EBPF
+        EBPF -->|ZeroMQ PUSH| WG_VPS
+        EBPF -->|XDP_DROP| XDP
     end
 
-    subgraph VPS GCP [VPS GCP - sensor_ebpf.py]
-        E(sensor_ebpf.py Python Daemon):::daemon
-        Z[ZeroMQ PUSH tcp:5555]:::daemon
+    subgraph WSL["💻 WSL2 Windows 11"]
+        WG_WSL("🔒 WireGuard wg0\n10.0.0.2"):::infra
+        RECV("🧠 receiver_gnn.py"):::daemon
+        STGNN("📊 STGNN TorchScript\nF1=0.9856"):::daemon
+        HEUR("📏 Heurístico\nSSH/RDP/Scan"):::heur
+        ENS{"🎯 Ensemble\nmax(STGNN, Heur)"}:::daemon
+        GEOIP("🌍 GeoIP MaxMind"):::daemon
+        SOCK("IPC Unix Socket"):::api
+        WG_WSL --> RECV
+        RECV --> STGNN
+        RECV --> HEUR
+        STGNN --> ENS
+        HEUR --> ENS
+        ENS --> GEOIP
+        ENS -->|BAN_IP| WG_VPS
+        ENS --> SOCK
     end
 
-    subgraph WSL [WSL2 - receiver_gnn.py]
-        R(receiver_gnn.py):::daemon
-        FE[Feature Engineering Online]:::daemon
-        STGNN[STGNN TorchScript Inference]:::daemon
-        HEUR[Heurística de Segurança]:::heur
-        ENS{Ensemble: max score}:::daemon
-        BAN[ZeroMQ PUB BAN_IP tcp:5556]:::daemon
+    subgraph API["🚀 FastAPI :8001"]
+        WS["WebSocket /ws/threats"]:::api
+        DB[("SQLite + JSONL")]:::api
+        SOCK --> WS
+        SOCK --> DB
     end
 
-    subgraph Control Plane [Control Plane & Telemetria]
-        I(IPC Unix Domain Socket)
-        J(FastAPI: dashboard_api_v2.py):::api
-        L[(SQLite: spectre_history_v2.db)]:::api
-        K[Dashboard React + Globe 3D]:::view
+    subgraph UI["⚛️ React Dashboard :5173"]
+        GLOBE("🌐 Globo 3D\nreact-globe.gl"):::view
+        GRAPH("🕸️ Grafo de Nós"):::view
+        CHART("📈 Tráfego + Anomalias"):::view
+        WS --> GLOBE
+        WS --> GRAPH
+        WS --> CHART
     end
 
-    A[Tráfego de Rede] -->|Filtro XDP| B
-    B -->|IP na Blacklist| C
-    B -->|IP Seguro ou Whitelist| D
-    D -->|Leitura Ring Buffer| E
-    E -->|ZeroMQ PUSH| Z
-    Z -->|WireGuard VPN| R
-    R --> FE
-    FE --> STGNN
-    FE --> HEUR
-    STGNN --> ENS
-    HEUR --> ENS
-    ENS -->|prob >= 70%| BAN
-    ENS -->|Telemetria| I
-    BAN -->|ZeroMQ SUB| B
-    W -->|Nunca bane gestão| B
-    I -->|Escuta IPC| J
-    J -->|Persistência| L
-    J -->|WebSockets Live| K
+    VPS ---|"WireGuard AES-256\nUDP 51820 — keepalive 25s"| WSL
 ```
+
+**Fluxo:** Pacote TCP → XDP Hook (kernel) → sensor_ebpf.py → ZeroMQ → WireGuard → receiver_gnn.py → STGNN + Heurístico → FastAPI → React Dashboard
 
 ### 1. Data Plane (Kernel Space)
 *   **eBPF / XDP (`ebpf/spectre_xdp.c`):** Injeta um programa C compilado para bytecode diretamente no driver da placa de rede. Se o IP de origem estiver no mapa hash `block_map`, o pacote é descartado (`XDP_DROP`) com latência na casa dos nanossegundos, blindando o sistema operacional antes de subir para a pilha TCP/IP convencional.
@@ -250,6 +251,8 @@ sudo systemctl start spectre-fusion spectre-api spectre-web
 | **Fase 5** | Interface Fortinet/Cloudflare | Visual corporativo de rede em PT-BR com toggle dinâmico de gráficos e prevenção a memory leaks. | **CONCLUÍDO** ✅ |
 | **Fase 6** | Auditoria XAI & Persistência GNN | Persistência de pesos de atenção GNN no SQLite e painel split-screen de auditoria de latência e pipeline. | **CONCLUÍDO** ✅ |
 | **Fase 7** | Ensemble STGNN + Heurística (Active IPS) | Integração da inferência STGNN real (TorchScript) com camada heurística de segurança. Whitelist BPF, Active Learning JSONL, Globo 3D de ataques. | **CONCLUÍDO** ✅ |
+| **Fase 8** | Infraestrutura Permanente (VPS + WireGuard) | IP fixo GCP (`34.172.18.46`), sensor eBPF como systemd service com restart automático, firewall UDP 51820, WireGuard keepalive, startup automático WSL via `.bat`. | **CONCLUÍDO** ✅ |
+| **Fase 9** | Retreinamento sem Concept Drift | Migrar dataset de treino de CIC-IDS2017 (flow-based) para **NF-UQ-NIDS-v2** (NetFlow v9, compatível eBPF). Fine-tuning com dados reais do honeypot. | **PLANEJADO** 🔜 |
 
 ---
 
@@ -261,25 +264,61 @@ O **SPECTRE_GRID** é parte do projeto de pesquisa em cibersegurança e redes in
 
 ## 📊 Resultados Empíricos: Honeypot em Produção
 
-A VPS GCP (IP público exposto) operou como **honeypot** captando ataques reais da internet durante o período de validação. Dados coletados pelo `sensor_ebpf.py` e processados pelo `receiver_gnn.py` com o Ensemble STGNN:
+A VPS GCP (IP fixo `34.172.18.46`, exposto na internet) operou como **honeypot**, captando ataques reais durante o período de validação (31/05–01/06/2026). Dados coletados pelo `sensor_ebpf.py` (systemd) e processados pelo Ensemble STGNN+Heurístico:
 
 | Métrica | Valor |
 | :--- | :--- |
-| **Total de Eventos Capturados** | 366 |
-| **Ameaças Detectadas e Bloqueadas** | 202 (55.2%) |
-| **IPs Atacantes Únicos** | 27 |
-| **Porta Mais Atacada** | :22 SSH (165 tentativas) |
-| **País de Maior Origem** | EUA (34 eventos externos) |
-| **RDP (Porta 3389)** | 5 tentativas de países como Bulgária e Vietnã |
+| **Total de Eventos Capturados** | **2.939** |
+| **Alertas Alta Confiança (P > 0.8)** | 624 (21.2%) |
+| **Alertas Moderados (P > 0.5)** | 750 (25.5%) |
+| **Probabilidade Média de Ameaça** | 0.253 (25.3%) |
+| **IPs Únicos** | 39 |
+| **Países de Origem** | 9 |
+| **Porta Mais Atacada** | :22 SSH (451 tentativas) |
+| **Ataque Mais Intenso** | 419 tentativas SSH em 30s (Brasil/Palhoça-SC) |
 
-### Top Países de Origem de Ataques
+### Distribuição Geográfica
 
-| País | Eventos |
-| :--- | :--- |
-| Estados Unidos | 34 |
-| Alemanha | 17 |
-| Bulgária | 4 |
-| Vietnã | 3 |
-| República da Coreia | 3 |
+| País | Eventos | Tipo |
+| :--- | :--- | :--- |
+| 🇺🇸 Estados Unidos | 2.173 (73.9%) | Infra Google/Fastly + ataques |
+| 🇧🇷 Brasil | 419 (14.3%) | **SSH Brute Force** (Palhoça-SC) |
+| ❓ Unknown | 304 (10.3%) | IPs não mapeados |
+| 🇩🇪 Alemanha | 30 (1.0%) | Atividade suspeita |
+| 🇧🇬 Bulgária + 🇻🇳 Vietnã + 🇰🇷 Coreia | 10 (0.3%) | Sondagens |
 
-> **Nota:** Os eventos com IP `177.5.130.126 (Brasil/Palhoça)` correspondem ao desenvolvedor acessando a VPS via SSH — corretamente protegido pela whitelist BPF e nunca banido.
+> **Validação:** O Ensemble STGNN+Heurístico distinguiu corretamente tráfego de infraestrutura Google (probabilidade ~0%) de ataques reais SSH (probabilidade ~99%), sem falsos positivos nos IPs CDN conhecidos.
+
+---
+
+## 🏗️ Infraestrutura de Produção
+
+| Componente | Tecnologia | Status |
+| :--- | :--- | :--- |
+| **VPS** | GCP e2-micro us-central1-a | ✅ IP fixo `34.172.18.46` |
+| **Sensor eBPF** | Python + BCC | ✅ systemd `Restart=always, RestartSec=10` |
+| **Túnel VPN** | WireGuard UDP 51820 | ✅ keepalive 25s, reconexão automática |
+| **Receiver** | Python + PyG TorchScript | ✅ WSL2, startup automático |
+| **API** | FastAPI + Uvicorn :8001 | ✅ WSL2, startup automático |
+| **Dashboard** | React + Vite :5173 | ✅ WSL2, startup automático |
+| **Persistência** | SQLite + JSONL | ✅ `spectre_history_v2.db` + `honeypot_real_attacks.jsonl` |
+
+**Startup automático:** `spectre_startup.bat` instalado em `shell:startup` — todos os serviços WSL sobem automaticamente ao ligar o PC.
+
+---
+
+## ⚠️ Limitação Documentada: Concept Drift
+
+O modelo STGNN foi treinado com o **CIC-IDS2017** usando `CICFlowMeter`, que gera features *após o fechamento do fluxo TCP*. O sensor eBPF processa *cada pacote individualmente*, gerando distribuições estatísticas diferentes — caracterizando **concept drift** entre treino e produção.
+
+O **Ensemble Heurístico** compensa parcialmente este efeito, mantendo F1 operacional aceitável. A solução definitiva é retreinar com **NF-UQ-NIDS-v2** (Sarhan et al., 2022) — dataset NetFlow v9 com features diretamente compatíveis com captura eBPF.
+
+---
+
+## 🚀 Próximos Passos
+
+| Prioridade | Ação | Dataset/Tecnologia |
+| :--- | :--- | :--- |
+| 🔴 Alta | Retreinar modelo eliminando concept drift | **NF-UQ-NIDS-v2** (Kaggle: `mohanad-sarhan/nf-uq-nids-v2`) |
+| 🟡 Média | Fine-tuning com ataques reais do honeypot | `honeypot_real_attacks.jsonl` (Active Learning) |
+| 🟢 Baixa | Migrar receiver para Rust/C++ nativo | LibTorch + tch-rs |
