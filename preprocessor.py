@@ -94,9 +94,9 @@ def build_graph(
       - Se não houver colunas de origem/destino, cria nós por índice de linha e liga linhas consecutivas
     """
     if src_cols_priority is None:
-        src_cols_priority = ['src_ip', 'src', 'source', 'src_host', 'source_ip']
+        src_cols_priority = ['IPV4_SRC_ADDR', 'src_ip', 'src', 'source', 'src_host', 'source_ip']
     if dst_cols_priority is None:
-        dst_cols_priority = ['dst_ip', 'dst', 'destination', 'dst_host', 'dest_ip']
+        dst_cols_priority = ['IPV4_DST_ADDR', 'dst_ip', 'dst', 'destination', 'dst_host', 'dest_ip']
 
     # selecionar coluna src/dst disponível
     src_col = next((c for c in src_cols_priority if c in df.columns), None)
