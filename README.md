@@ -86,8 +86,8 @@ graph TB
 ### 2. User Space Daemon (Nativo C++ / Rust)
 *   **Motor de Fusão C++ (`ebpf/loader_fusion_v2.cpp`):** Escrito em C++17 com suporte multi-thread, lê do Ring Buffer e alimenta a inferência da LibTorch.
 *   **Alternativa em Rust (`loader_fusion_rs/src/main.rs`):** Implementação concorrente com Tokio e bindings `tch-rs` para LibTorch.
-*   **Normalização Estática (Welford):** Utiliza médias e desvios padrão dinâmicos calculados online para estabilizar tensores.
-*   **Inference Engine (LibTorch):** Carrega o modelo compilado em TorchScript (`spectre_model_scripted.pt`), monta o grafo de relacionamento e executa a inferência relacional da STGNN.
+*   **Normalização Online (Z-Score / Welford):** Utiliza o algoritmo de Welford para calcular médias e desvios padrão *dinamicamente* em tempo real (sem dados históricos prévios), estabilizando os tensores contra distribuições de tráfego variável.
+*   **Inference Engine (LibTorch) com Dynamic Graph Batching:** Carrega o modelo compilado em TorchScript (`spectre_model_scripted.pt`). A cada ciclo de 1 segundo, agrega todos os IPs ativos em um lote (`active_ips`), constrói a matriz bidirecional de arestas `[2, E]` a partir dos IPs de destino reais e executa a inferência relacional da STGNN com Message Passing topológico real.
 
 ### 3. Control Plane & UI (FastAPI / Go & React Dashboard)
 *   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco removendo arquivos de log intermediários. O Daemon transmite os JSONs diretamente para a memória RAM do backend FastAPI ([dashboard_api_v2.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_api_v2.py)) ou do Go Server ([main.go](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_go/main.go)).
@@ -143,7 +143,7 @@ Entrada: [Nós, Seq_Len = 10, Features = 20]
 *   [model.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/model.py): Implementação da rede neural `SPECTRE_GRID`.
 *   [train.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/train.py): Pipeline de treino usando os grafos do PyTorch Geometric `.pt`.
 *   [preprocessor.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/preprocessor.py): Engenharia de dados e seleção automática das **Top-20 Features de Pearson**.
-*   [inference.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/inference.py): Módulo demonstrativo de inferência com tensores dummy.
+*   [inference.py](inference.py): Módulo de inferência que processa CSVs reais via `preprocessor.py` (ou tensores mock para dry-run sem dados).
 *   [validate_parity.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/validate_parity.py): Compara a coerência de saída entre o código Python e o bytecode LibTorch C++.
 *   [main.cpp](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/main.cpp): Wrapper C++ legado para execução direta do modelo.
 *   [ebpf/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/ebpf): Códigos-fonte do driver Kernel Space (`spectre_xdp.c`), do motor C++ v2 (`loader_fusion_v2.cpp`) e da versão legada (`loader_fusion_legacy.cpp`).
@@ -247,13 +247,13 @@ sudo systemctl start spectre-fusion spectre-api spectre-web
 | **Fase 6** | Auditoria XAI & Persistência GNN | Persistência de pesos de atenção GNN no SQLite e painel split-screen de auditoria de latência e pipeline. | **CONCLUÍDO** ✅ |
 | **Fase 7** | Ensemble STGNN + Heurística (Active IPS) | Integração da inferência STGNN real (TorchScript) com camada heurística de segurança. Whitelist BPF, Active Learning JSONL, Globo 3D de ataques. | **CONCLUÍDO** ✅ |
 | **Fase 8** | Infraestrutura Permanente (VPS + WireGuard) | IP fixo GCP (`34.172.18.46`), sensor eBPF como systemd service com restart automático, firewall UDP 51820, WireGuard keepalive, startup automático WSL via `.bat`. | **CONCLUÍDO** ✅ |
-| **Fase 9** | Retreinamento sem Concept Drift | Migrar dataset de treino de CIC-IDS2017 (flow-based) para **NF-UQ-NIDS-v2** (NetFlow v9, compatível eBPF). Fine-tuning com dados reais do honeypot. | **PLANEJADO** 🔜 |
+| **Fase 9** | Retreinamento sem Concept Drift | Migrar dataset de treino de CIC-IDS2017 (flow-based) para **NF-UQ-NIDS-v2** (NetFlow v9) e **DBVA-2025** (dataset recente com tráfego moderno). Fine-tuning com dados reais do honeypot. | **PLANEJADO** 🔜 |
 
 ---
 
 ## 🏛️ Contexto Acadêmico
 
-O **SPECTRE_GRID** é parte do projeto de pesquisa em cibersegurança e redes inteligentes desenvolvido no **IFC Brusque**. O projeto iniciou usando amostras do dataset NSL-KDD e evoluiu para o CIC-IDS2017 para refletir as necessidades de detecção contra vetores de ataques de próxima geração. O histórico completo de iterações do Git e análises estruturais de pesquisa estão consolidados no arquivo [research_history_log.md](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/research_history_log.md).
+O **SPECTRE_GRID** é parte do projeto de pesquisa em cibersegurança e redes inteligentes desenvolvido no **IFC Brusque**. O projeto iniciou usando amostras do dataset NSL-KDD e evoluiu para o CIC-IDS2017 para refletir as necessidades de detecção contra vetores de ataques de próxima geração. Para o embasamento teórico completo das tecnologias envolvidas, consulte o [SPECTRE_LIVRO_BASE.md](docs/SPECTRE_LIVRO_BASE.md).
 
 ---
 
