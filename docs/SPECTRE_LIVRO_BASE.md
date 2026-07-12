@@ -21,20 +21,20 @@ O SPECTRE GRID resolve esses gargalos combinando de forma harmoniosa três camad
 
 ```mermaid
 graph TD
-    subgraph Plano de Dados (Kernel Space)
+    subgraph DadosKernel ["Plano de Dados (Kernel Space)"]
         XDP[eBPF/XDP Hook] -->|Filtragem física L2/L3/L4| BM{block_map}
         BM -->|IP Bloqueado| DROP[XDP_DROP]
         BM -->|IP Liberado| PASS[XDP_PASS]
     end
 
-    subgraph Plano de Fusão (User Space - Daemon C++)
+    subgraph FusaoCpp ["Plano de Fusão (User Space - Daemon C++)"]
         PASS -->|Ring Buffer Lockless| POLLER[BPF Ring Buffer Poller]
         POLLER -->|Features & Z-Score| INF[Motor de Inferência LibTorch]
         INF -->|Inferência IA STGNN| BLOCK[Ação de Bloqueio]
         BLOCK -.->|Escreve no block_map| BM
     end
 
-    subgraph Plano de Controle (User Space - Web API)
+    subgraph ControleWeb ["Plano de Controle (User Space - Web API)"]
         INF -->|Alerta JSON via IPC| API[FastAPI Unix Socket Listener]
         API -->|asyncio.Queue| WORKER[DB Worker Batching]
         WORKER -->|aiosqlite| DB[(SQLite)]
@@ -1215,7 +1215,7 @@ graph TD
         B[Estrutura de Grafo: edge_index de tamanho 2 x E]
     end
 
-    subgraph Pipeline Temporal (Individual por Nó)
+    subgraph PipelineTemporal ["Pipeline Temporal (Individual por Nó)"]
         A --> C[Transpose 1: Ajuste de dimensões para canais]
         C --> D[CNN1D: Extração de padrões temporais rápidos]
         D --> E[Transpose 2: Restauração da ordem cronológica]
@@ -1223,13 +1223,13 @@ graph TD
         F --> G[Extração do último hidden state de tamanho N x 64]
     end
 
-    subgraph Pipeline Espacial (Interação Relacional)
+    subgraph PipelineEspacial ["Pipeline Espacial (Interação Relacional)"]
         G --> H[GATv2Conv: Fusão com o grafo edge_index]
         B --> H
         H --> I[Message Passing ponderado por atenção das 4 cabeças: N x 256]
     end
 
-    subgraph Classificação
+    subgraph Classificacao [Classificação]
         I --> J[Camadas Lineares com Dropout e Ativação ReLU]
         J --> K[Saída Logit: Probabilidade de Ameaça para cada Host: N]
     end
