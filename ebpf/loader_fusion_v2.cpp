@@ -246,7 +246,6 @@ static int handle_event(void *ctx, void *data, size_t data_len) {
 // =====================================================================
 void inference_worker(torch::jit::script::Module module, int block_map_fd) {
     std::unordered_map<uint32_t, FlowContext> flow_tracker;
-    torch::Tensor edge_tensor = torch::tensor({{0}, {0}}, torch::kLong);
     uint64_t last_scan_ns = clock_ns();
     
     std::vector<flow_event_t> batch;
@@ -275,6 +274,11 @@ void inference_worker(torch::jit::script::Module module, int block_map_fd) {
         // Dispara IA a cada 1 segundo
         if (now - last_scan_ns >= 1000000000ULL) {
             last_scan_ns = now;
+            
+            std::vector<uint32_t> active_ips;
+            std::vector<torch::Tensor> node_tensors;
+            std::unordered_map<uint32_t, int> ip_to_idx;
+            
             for (auto& pair : flow_tracker) {
                 uint32_t src_ip = pair.first;
                 FlowContext& ctx = pair.second;
@@ -283,7 +287,6 @@ void inference_worker(torch::jit::script::Module module, int block_map_fd) {
 
                 std::array<float, NUM_FEATURES> feat = {};
                 derive_features(ctx.latest_metrics, ctx, now, feat);
-
                 float raw_pps = feat[7];
                 float raw_syn_ratio = feat[9];
 
@@ -299,31 +302,75 @@ void inference_worker(torch::jit::script::Module module, int block_map_fd) {
                 ctx.current_index = (ctx.current_index + 1) % SEQ_LEN;
                 ctx.packet_count++;
 
-                float prob = 0.0f;
+                // Heurística rápida
+                if (raw_pps > 100.0f && raw_syn_ratio > 0.8f) {
+                    struct block_info_t binfo = {}; binfo.block_time_ns = now; binfo.blocked_packets = 0;
+                    bpf_map_update_elem(block_map_fd, &src_ip, &binfo, BPF_ANY);
+                    write_cpp_alert_to_log(src_ip, 0.98f, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
+                    continue; // Pula GNN se a heurística já pegou
+                }
 
                 if (ctx.packet_count >= SEQ_LEN) {
-                    try {
-                        torch::Tensor input = build_tensor(ctx);
-                        std::vector<torch::jit::IValue> inputs;
-                        inputs.push_back(input); inputs.push_back(edge_tensor);
-                        torch::Tensor output = module.forward(inputs).toTensor();
-                        prob = torch::sigmoid(output).item<float>();
+                    // Remove dimensão do batch interno [1, 10, 20] -> [10, 20] para juntar depois
+                    torch::Tensor t = build_tensor(ctx).squeeze(0);
+                    ip_to_idx[src_ip] = active_ips.size();
+                    active_ips.push_back(src_ip);
+                    node_tensors.push_back(t);
+                } else {
+                    write_cpp_alert_to_log(src_ip, 0.0f, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
+                }
+            }
 
-                        if (raw_pps > 100.0f && raw_syn_ratio > 0.8f) prob = 0.98f;
-
+            int N = active_ips.size();
+            if (N > 0) {
+                // Batching: [N, SEQ_LEN, NUM_FEATURES]
+                torch::Tensor x = torch::stack(node_tensors, 0); 
+                
+                std::vector<int64_t> src_edges;
+                std::vector<int64_t> dst_edges;
+                
+                for (int i = 0; i < N; ++i) {
+                    uint32_t ip = active_ips[i];
+                    FlowContext& ctx = flow_tracker[ip];
+                    uint32_t dst_ip = ctx.latest_key.dst_ip;
+                    
+                    // Auto-loop exigido pelo GATConv
+                    src_edges.push_back(i);
+                    dst_edges.push_back(i);
+                    
+                    // Conexões laterais dinâmicas
+                    if (ip_to_idx.count(dst_ip)) {
+                        int j = ip_to_idx[dst_ip];
+                        src_edges.push_back(i); dst_edges.push_back(j);
+                        src_edges.push_back(j); dst_edges.push_back(i);
+                    }
+                }
+                
+                auto opts = torch::TensorOptions().dtype(torch::kLong);
+                torch::Tensor e_src = torch::from_blob(src_edges.data(), { (long)src_edges.size() }, opts).clone();
+                torch::Tensor e_dst = torch::from_blob(dst_edges.data(), { (long)dst_edges.size() }, opts).clone();
+                torch::Tensor edge_index = torch::stack({e_src, e_dst}, 0); // [2, E]
+                
+                try {
+                    std::vector<torch::jit::IValue> inputs;
+                    inputs.push_back(x); 
+                    inputs.push_back(edge_index);
+                    torch::Tensor output = module.forward(inputs).toTensor();
+                    torch::Tensor probs = torch::sigmoid(output);
+                    
+                    for (int i = 0; i < N; ++i) {
+                        float prob = probs[i].item<float>();
+                        uint32_t src_ip = active_ips[i];
                         if (prob > DROP_THRESH) {
                             struct block_info_t binfo = {}; binfo.block_time_ns = now; binfo.blocked_packets = 0;
                             bpf_map_update_elem(block_map_fd, &src_ip, &binfo, BPF_ANY);
                         }
-                    } catch (const c10::Error& e) {
-                        std::cerr << "[ERRO] IA: " << e.what() << std::endl;
+                        FlowContext& ctx = flow_tracker[src_ip];
+                        write_cpp_alert_to_log(src_ip, prob, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
                     }
-                } else if (raw_pps > 100.0f && raw_syn_ratio > 0.8f) {
-                    prob = 0.98f;
-                    struct block_info_t binfo = {}; binfo.block_time_ns = now; binfo.blocked_packets = 0;
-                    bpf_map_update_elem(block_map_fd, &src_ip, &binfo, BPF_ANY);
+                } catch (const c10::Error& e) {
+                    std::cerr << "[ERRO] IA: " << e.what() << std::endl;
                 }
-                write_cpp_alert_to_log(src_ip, prob, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
             }
         } else {
             // Dormir um pouco para não fritar a CPU caso a fila esteja vazia

@@ -1,0 +1,11 @@
+Refatoração Arquitetural GNN e Organização de Documentos (Pós-Auditoria)
+
+DOCUMENTAÇÃO:
+- Limpeza drástica na raiz: Exclusão de arquivos redundantes (project_overview.md, fusion_changelog.md).
+- Unificação: README.md agora concentra a arquitetura completa e remove aliases obsoletos (Super_IDS_Net).
+- ROADMAP: project_state.md renomeado para docs/ROADMAP.md, focado estritamente na expansão do dataset DBVA-2025.
+- Isolamento Acadêmico: Todo o material de TCC e ABNT migrado para docs/tcc/.
+
+MOTOR C++ (eBPF) E INFERÊNCIA PYTHON:
+- inference.py: Remoção do código mock. Adicionado pipeline real recebendo parâmetros CSV, passando pelo preprocessor.py e inferindo probabilidade de intrusão com tensores reais.
+- loader_fusion_v2.cpp: CORREÇÃO CRÍTICA DO GATCONV. O daemon nativo abandonou o envio de pacotes N=1 (um nó isolado com auto-loop). Agora ele efetua "Graph Batching" verdadeiro na memória C++, iterando sobre o Ring Buffer e ligando IPs ativos bidirecionalmente, reabilitando o Message Passing da STGNN (LibTorch).

@@ -44,3 +44,4 @@ Thumbs.db
 # === Logs & Outputs ===
 *.log
 data/processed/confusion_matrix.png
+.aider*

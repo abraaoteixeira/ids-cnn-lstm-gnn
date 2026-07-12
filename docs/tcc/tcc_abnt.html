@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Pré-TCC SPECTRE GRID</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true });
+    </script>
+    <style>
+        @page {
+            size: A4;
+            margin: 3cm 2cm 2cm 3cm;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            text-align: justify;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }
+        .page-break { page-break-before: always; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
+        
+        /* Capa */
+        .capa { display: flex; flex-direction: column; height: 90vh; text-align: center; }
+        .capa .header { margin-top: 0; }
+        .capa .author { margin-top: auto; margin-bottom: auto; font-weight: bold; }
+        .capa .title { font-weight: bold; margin-bottom: auto; }
+        .capa .footer { margin-top: auto; font-weight: bold;}
+        
+        /* Folha de Rosto */
+        .folha-rosto { display: flex; flex-direction: column; height: 90vh; text-align: center; }
+        .folha-rosto .author { margin-top: 0; font-weight: bold;}
+        .folha-rosto .title { margin-top: auto; margin-bottom: auto; font-weight: bold; }
+        .folha-rosto .recuo {
+            margin-left: 50%;
+            text-align: justify;
+            font-size: 10pt;
+            line-height: 1.0; 
+        }
+        .folha-rosto .footer { margin-top: auto; font-weight: bold;}
+
+        /* Títulos de Seção */
+        h1 { font-size: 12pt; text-transform: uppercase; font-weight: bold; text-align: left; margin-top: 24pt; margin-bottom: 24pt; }
+        h2 { font-size: 12pt; text-transform: uppercase; font-weight: bold; margin-top: 24pt; margin-bottom: 24pt; }
+        h3 { font-size: 12pt; font-weight: bold; margin-top: 24pt; margin-bottom: 24pt; }
+
+        p { text-indent: 1.25cm; margin: 0 0 12pt 0; }
+        
+        /* Resumo */
+        .resumo-title { text-align: center; text-transform: uppercase; font-weight: bold; font-size: 12pt; margin-bottom: 24pt; }
+        .resumo-text { text-indent: 0; margin-bottom: 12pt; }
+        .keywords { font-weight: bold; }
+
+        /* Referencias */
+        .referencias { text-align: left; }
+        .referencias p { text-indent: 0; margin-bottom: 12pt; text-align: left; line-height: 1.0; }
+    </style>
+</head>
+<body>
+    <!-- Capa -->
+    <div class="capa">
+        <div class="header">
+            <img src="https://raw.githubusercontent.com/abraaoteixeira/ids-cnn-lstm-gnn/main/logo-ifc.png" alt="IFC" style="width:70px; margin-bottom:10px;"><br>
+            <span class="uppercase bold">Instituto Federal Catarinense<br>Redes De Computadores<br><i>Campus</i> Brusque</span>
+        </div>
+        <div class="author uppercase">ABRAÃO TEIXEIRA DA SILVA</div>
+        <div class="title uppercase">SPECTRE GRID: SISTEMA DE DETECÇÃO E PREVENÇÃO DE INTRUSÃO HÍBRIDO BASEADO EM EBPF/XDP E IA PARA REDES COMPLEXAS</div>
+        <div class="footer">Brusque<br>2026</div>
+    </div>
+
+    <!-- Folha de Rosto -->
+    <div class="folha-rosto page-break">
+        <div class="author uppercase">ABRAÃO TEIXEIRA DA SILVA</div>
+        <div class="title uppercase">SPECTRE GRID: SISTEMA DE DETECÇÃO E PREVENÇÃO DE INTRUSÃO HÍBRIDO BASEADO EM EBPF/XDP E IA PARA REDES COMPLEXAS</div>
+        <div class="recuo">
+            Trabalho de Conclusão de Curso submetido ao curso de Tecnologia em Redes de Computadores do Instituto Federal Catarinense – Campus Brusque para a obtenção do título de Tecnólogo em Redes de Computadores.<br><br>
+            Professor Orientador: Prof. Dr. Jackson Mallmann
+        </div>
+        <div class="footer">Brusque<br>2026</div>
+    </div>
+
+    <!-- Resumo -->
+    <div class="page-break">
+        <div class="resumo-title">RESUMO</div>
+        <p class="resumo-text">O avanço das tecnologias de rede e a crescente sofisticação dos ataques cibernéticos exigem sistemas de segurança cada vez mais rápidos e inteligentes. Um dos principais desafios enfrentados por infraestruturas modernas é a detecção e mitigação em tempo real de movimentações laterais e anomalias de rede com baixíssima latência. Neste contexto, este trabalho apresenta o projeto SPECTRE GRID, um Sistema de Detecção e Prevenção de Intrusão (IDS/IPS) híbrido de alta performance. A solução proposta integra a tecnologia de filtragem em nível de driver do kernel (eBPF/XDP) com modelos avançados de Inteligência Artificial Gráfica Espaço-Temporal (STGNN). O sistema utiliza um sensor eBPF para capturar tráfego diretamente na placa de rede, realizar sumarização estatística e, se necessário, descartar pacotes maliciosos na casa dos nanossegundos. A classificação de ameaças em camada de aplicação é realizada por uma arquitetura neural baseada no framework PyTorch Geometric, que modela o tráfego da rede como um grafo, permitindo analisar interações topológicas e temporais entre os fluxos. O sistema também integra um painel de controle corporativo desenvolvido em React para visualização em tempo real e auditoria de IA. O resultado obtido é um protótipo funcional implementado como honeypot em nuvem, capaz de mitigar ameaças ativamente com latência mínima, resolvendo gargalos tradicionais de soluções IDS legadas.</p>
+        <p class="resumo-text"><span class="keywords">Palavras-chave:</span> Cibersegurança. Sistema de Detecção de Intrusão. eBPF. Redes Neurais em Grafos. STGNN.</p>
+    </div>
+
+    <!-- Abstract -->
+    <div class="page-break">
+        <div class="resumo-title">ABSTRACT</div>
+        <p class="resumo-text">The continuous advancement of network technologies and the increasing sophistication of cyber attacks require faster and smarter security systems. One of the main challenges faced by modern infrastructures is the real-time detection and mitigation of lateral movements and network anomalies with ultra-low latency. In this context, this work presents the SPECTRE GRID project, a high-performance hybrid Intrusion Detection and Prevention System (IDS/IPS). The proposed solution integrates kernel-level filtering technology (eBPF/XDP) with advanced Space-Temporal Graph Neural Network (STGNN) models. The system uses an eBPF sensor to capture traffic directly at the network interface, perform statistical summarization, and, if necessary, drop malicious packets in nanoseconds. Threat classification at the application layer is performed by a neural architecture based on the PyTorch Geometric framework, which models network traffic as a graph, allowing the analysis of topological and temporal interactions between flows. The system also integrates an enterprise control panel developed in React for real-time visualization and AI auditing. The expected result is a functional prototype implemented as a cloud honeypot, capable of actively mitigating threats with minimal latency, solving traditional I/O bottlenecks in legacy IDS solutions.</p>
+        <p class="resumo-text"><span class="keywords">Keywords:</span> Cybersecurity. Intrusion Detection System. eBPF. Graph Neural Networks. STGNN.</p>
+    </div>
+
+    <!-- Sumário -->
+    <div class="page-break">
+        <div class="resumo-title">SUMÁRIO</div>
+        <p class="resumo-text" style="font-weight: bold;">1 INTRODUÇÃO</p>
+        <p class="resumo-text">1.1 PROBLEMA DE PESQUISA</p>
+        <p class="resumo-text">1.2 OBJETIVOS</p>
+        <p class="resumo-text" style="margin-left: 20px;">1.2.1 Objetivo Geral</p>
+        <p class="resumo-text" style="margin-left: 20px;">1.2.2 Objetivos Específicos</p>
+        <p class="resumo-text" style="font-weight: bold;">2 DESENVOLVIMENTO</p>
+        <p class="resumo-text">2.1 METODOLOGIA</p>
+        <p class="resumo-text">2.2 FUNDAMENTAÇÃO TEÓRICA</p>
+        <p class="resumo-text">2.3 REVISÃO BIBLIOGRÁFICA</p>
+        <p class="resumo-text" style="font-weight: bold;">REFERÊNCIAS</p>
+    </div>
+
+    <!-- Introdução -->
+    <div class="page-break">
+        <h1>1 INTRODUÇÃO</h1>
+        <p>O desenvolvimento da computação distribuída e a ubiquidade da Internet das Coisas (IoT) trouxeram consigo a ampliação da superfície de ataque disponível para agentes maliciosos. A literatura científica contemporânea busca distanciar a intuição do senso comum — característica do conhecimento popular — substituindo-a pelo rigor metodológico do conhecimento científico na área de Ciência da Computação (ARAÚJO, 2004). Sob esse prisma, investigar novas maneiras de analisar tráfego e construir sistemas de prevenção de intrusão constitui um esforço constante da engenharia de software e redes.</p>
+        <p>A evolução dos firewalls e soluções IDS/IPS (Intrusion Detection and Prevention Systems) muitas vezes se depara com um conflito técnico: o processamento excessivo de dados gerados pelos fluxos modernos impacta o desempenho das redes, ao mesmo tempo que as assinaturas e as antigas regras heurísticas tornam-se ineficazes frente a ataques do tipo "zero-day" ou varreduras distribuídas. A mudança na forma como inspecionamos os dados representa, nos termos de Kuhn (2000), uma transição de paradigma tecnológico na epistemologia computacional, introduzindo filtros dinâmicos diretos na placa de rede, evitando percursos longos até a camada de aplicação.</p>
+        <p>Este cenário fundamenta a necessidade de arquiteturas inovadoras que unam interceptação de baixíssimo nível (eBPF/XDP) com raciocínio analítico profundo de redes neurais (STGNN).</p>
+
+        <h2>1.1 PROBLEMA DE PESQUISA</h2>
+        <p>Diante do contexto apresentado, a presente pesquisa busca responder à seguinte questão: Como desenvolver um Sistema de Detecção e Prevenção de Intrusão capaz de bloquear ataques em tempo real com baixa latência, integrando interceptação em nível de kernel (eBPF/XDP) com inteligência artificial baseada em grafos que compreenda o contexto topológico da rede?</p>
+
+        <h2>1.2 OBJETIVOS</h2>
+        <h3>1.2.1 Objetivo Geral</h3>
+        <p>Desenvolver e validar um protótipo funcional de IDS/IPS híbrido e de alta performance, denominado SPECTRE GRID, capaz de detectar e bloquear ataques em tempo real por meio da integração de kernel hooking (eBPF/XDP) com Inteligência Artificial Gráfica Espaço-Temporal (STGNN).</p>
+
+        <h3>1.2.2 Objetivos Específicos</h3>
+        <p style="text-indent: 0; margin-left: 1.25cm;">• Implementar filtros e extratores de recursos em nível de kernel utilizando tecnologia eBPF/XDP, interceptando pacotes via eXpress Data Path.</p>
+        <p style="text-indent: 0; margin-left: 1.25cm;">• Desenvolver um motor de processamento unificado (daemon C++/Rust) que opere via ZeroMQ e Unix Sockets para reduzir a latência e eliminar o I/O de disco físico.</p>
+        <p style="text-indent: 0; margin-left: 1.25cm;">• Projetar e treinar um modelo preditivo STGNN, composto por camadas CNN1D, LSTM e GATConv, para análise relacional de vetores de rede.</p>
+        <p style="text-indent: 0; margin-left: 1.25cm;">• Construir uma interface gráfica interativa (dashboard em React) contendo topologia force-directed em canvas, auditoria do modelo de IA e visualizações em tempo real.</p>
+        <p style="text-indent: 0; margin-left: 1.25cm;">• Avaliar o desempenho empírico através da implantação do sistema operando como um honeypot em um ambiente de produção na nuvem.</p>
+    </div>
+
+    <!-- Desenvolvimento -->
+    <div class="page-break">
+        <h1>2 DESENVOLVIMENTO</h1>
+        <h2>2.1 METODOLOGIA</h2>
+        <p>Tratando-se de uma pesquisa aplicada focada na criação de um artefato tecnológico, a metodologia adotada será orientada pelo processo de Design Science Research Process (DSRP) (PEFFERS et al., 2007). Este paradigma é focado na criação e avaliação de artefatos de TI para a resolução de problemas estruturais, dividindo a pesquisa nas seguintes etapas lógicas:</p>
+        <p>Inicialmente, na fase de Identificação do Problema e Motivação, realizou-se uma revisão sistemática da literatura (GALVÃO; RICARTE, 2019) para evidenciar a problemática de vazamento de latência nos tradicionais sistemas de IDS quando submetidos a altíssimas taxas de transferência.</p>
+        <p>Em seguida, na Definição dos Objetivos de Solução, ocorreu a projeção da arquitetura desacoplada em três frentes: Data Plane (eBPF), Fusion Motor (daemon) e Control Plane (Inteligência Artificial e API).</p>
+        <p>Durante o Design e Desenvolvimento, ocorreu a implementação do kernel hook via C, integrando contadores estáticos através de mapas hash bidirecionais. O desenvolvimento neural fará o processamento dos tensores em dimensões tridimensionais via LibTorch.</p>
+        <p>Por fim, na fase de Demonstração e Avaliação, procedeu-se com a configuração do protótipo em uma VPS Google Cloud Platform com um túnel WireGuard integrado, expondo-o ativamente como um honeypot. A captura massiva analisará métricas críticas como matriz de confusão e latência em milissegundos.</p>
+
+        <h2>2.2 FUNDAMENTAÇÃO TEÓRICA</h2>
+        <p>Tradicionalmente, a filtragem de rede no ecossistema Linux envolvia a passagem do pacote através de uma complexa pilha TCP/IP. O Extended Berkeley Packet Filter (eBPF) e sua extensão eXpress Data Path (XDP) subverteram a estrutura legada. A literatura descreve essa transição como uma genuína quebra de paradigma (JACOBINA, 2000), na medida em que a interceptação agora ocorre a nível de placa de rede.</p>
+        <p>No projeto SPECTRE GRID, o programa eBPF realiza verificações de segurança atômica instantes após a placa de rede registrar a interrupção. Através de Hash Maps e LRU Maps, dados estatísticos vitais são sumarizados diretamente na memória RAM em kernel space. Quando um fluxo atinge o limite probabilístico de anomalia determinado pela IA, a instrução mitigatória XDP_DROP é chamada, garantindo que o atacante veja seu tráfego interrompido em literais nanossegundos.</p>
+        <p>Abaixo ilustramos em notação formal o diagrama de fluxo híbrido da solução proposta:</p>
+        
+        <div class="mermaid" style="text-align: center; margin: 20px 0; font-size: 8pt;">
+graph TD
+    classDef kernel fill:#f96,stroke:#333,stroke-width:2px;
+    classDef daemon fill:#69c,stroke:#333,stroke-width:2px;
+    classDef api fill:#4db6ac,stroke:#333,stroke-width:2px;
+    classDef ai fill:#e57373,stroke:#333,stroke-width:2px;
+    classDef db fill:#81c784,stroke:#333,stroke-width:2px;
+    classDef ui fill:#64b5f6,stroke:#333,stroke-width:2px;
+
+    Attacker("Ataques Externos (Internet)") -->|Tráfego TCP/UDP| VPS
+    
+    subgraph VPS["Nó de Borda em Produção (GCP e2-micro: 34.172.18.46)"]
+        XDP("Filtro XDP / eBPF (Kernel Space)"):::kernel
+        MAPS("Tabelas LRU & Hash Maps"):::kernel
+        ZMQ("Sensor ZeroMQ Push"):::daemon
+        XDP -->|XDP_DROP em Nanossegundos| XDP
+        XDP -->|Coleta Atômica de Métricas| MAPS
+        MAPS --> ZMQ
+    end
+
+    VPS ---|"Túnel Criptografado WireGuard (UDP 51820)"| WSL
+
+    subgraph WSL["Ambiente de Processamento Central (WSL2)"]
+        subgraph FUSION["Motor de Fusão C++/Rust"]
+            PULL("ZeroMQ Pull Thread (Polling)"):::daemon
+            BUFFER("Ring Buffer & Welford Z-Score"):::daemon
+            PULL --> BUFFER
+        end
+        
+        subgraph MODEL["Processamento de IA Híbrido"]
+            CNN("CNN1D (Foco Temporal Local)"):::ai
+            LSTM("LSTM (Correlações Históricas)"):::ai
+            GAT("GATConv (Message Passing Topológico)"):::ai
+            HEUR("Camada de Validação Heurística"):::ai
+            ENS{"Ensemble Decisório"}:::ai
+            
+            BUFFER --> CNN
+            BUFFER --> HEUR
+            CNN --> LSTM --> GAT --> ENS
+            HEUR --> ENS
+        end
+        
+        subgraph CONTROL["Plano de Controle IPC"]
+            API("FastAPI Uvicorn (Unix Sockets)"):::db
+            SQL("SQLite & JSONL (Persistência)"):::db
+            WS("Stream WebSockets Bidirecional"):::db
+            
+            ENS -->|Alerta JSON| API
+            API --> SQL
+            API --> WS
+        end
+        
+        FUSION --> MODEL
+        MODEL --> CONTROL
+    end
+
+    subgraph DASHBOARD["Dashboard React Premium (Porta 5173)"]
+        GLOBE("Globo 3D de Ameaças (WebGL)"):::ui
+        TOPO("Topologia Force-Directed (Relação de IPs)"):::ui
+        HUD("HUD de Auditoria XAI (Atenção Neural)"):::ui
+        
+        WS --> GLOBE
+        WS --> TOPO
+        WS --> HUD
+    end
+        </div>
+
+        <p>Abordagens tradicionais de Machine Learning processam fluxos de dados como ocorrências lineares e singulares, descartando informações essenciais de relacionalidade (SARHAN et al., 2022). Em contraste, o SPECTRE GRID integra Redes Neurais em Grafos Espaço-Temporais (STGNN). Ao modelar IPs globais como vértices de um grafo topológico, o sistema converte tráfego em matrizes adjacentes.</p>
+        <p>Por intermédio da auditoria explicável (Explainable AI), os pesos da rede GATConv são realimentados no WebSocket em tempo real para visualizações na camada WebGL do Dashboard. Dessa forma, o conhecimento validado afasta-se de conjecturas do senso comum (ARAÚJO, 2004), substituindo-os por certezas matemáticas vetoriais em defesas perimetrais.</p>
+
+        <h2>2.3 REVISÃO BIBLIOGRÁFICA</h2>
+        <p>A literatura recente evidencia uma forte transição dos sistemas clássicos de detecção para abordagens baseadas em aprendizado de máquina. No contexto de redes distribuídas, otimizar a detecção de intrusão para a Internet das Coisas (IoT) tornou-se primordial, visto que dispositivos periféricos possuem restrições computacionais severas, exigindo modelos ágeis (WIRES, 2023).</p>
+        <p>Ademais, as abordagens de Machine Learning (ML) e Deep Learning (DL) vêm demonstrando superioridade na extração de características não-lineares em tráfego de rede complexo (SPRINGER, 2022). O uso de ML na cibersegurança provê capacidade adaptativa contra ataques do tipo zero-day que faltava nas antigas regras baseadas em assinaturas estáticas (RESEARCHGATE, 2021). Diversos estudos de ponta reforçam a aplicação de Deep Learning como a principal fronteira na eficácia de IDS modernos, maximizando o processamento de grandes volumes de tráfego capturado (IEEE, 2022).</p>
+        <p>Paralelamente, os Sistemas Híbridos de Detecção de Intrusão, que mesclam análises preditivas com validação heurística, apresentam as menores taxas de falsos positivos, justificando a adoção de arquiteturas mistas como a do projeto SPECTRE GRID (RESEARCHGATE, 2023). Uma exploração profunda das tecnologias IDS contemporâneas destaca a flexibilidade destas implementações em nuvem e a integração fluída em pipelines de observabilidade (JAMES, 2022). Por fim, na análise comparativa estrutural entre a Inteligência Artificial e os IDS Tradicionais, fica constatado que as defesas legadas sofrem de gargalos de latência inaceitáveis frente a inundações de pacotes, enquanto as novas defesas com IA conseguem escalar de forma dinâmica e responsiva (RESEARCHGATE, 2020).</p>
+
+    </div>
+
+    <!-- Referências -->
+    <div class="page-break referencias">
+        <div class="resumo-title">REFERÊNCIAS</div>
+        <p>ARAÚJO, Carlos Alberto Ávila. A ciência como forma de conhecimento. In: ARAÚJO, C. A. A. <b>A ciência como forma de conhecimento</b>. [S. l.: s. n.], 2004.</p>
+        <p>DAVIDSON, Andrew; DELBRIDGE, Elizabeth. How to write a research paper. <b>Paediatrics and Child Health</b>, v. 22, n. 2, p. 61-65, 2012.</p>
+        <p>GALVÃO, Maria Cristiane Barbosa; RICARTE, Ivan Luiz Marques. Revisão sistemática da literatura: conceituação, produção e publicação. <b>Logeion: Filosofia da informação</b>, v. 6, n. 1, p. 57-73, 2019.</p>
+        <p>JACOBINA, Ronaldo Ribeiro. O paradigma da epistemologia histórica: a contribuição de Thomas Kuhn. <b>História, Ciências, Saúde-Manguinhos</b>, Rio de Janeiro, v. 6, n. 3, p. 609-630, 2000.</p>
+        <p>PEFFERS, Ken; TUUNANEN, Tuure; ROTHENBERGER, Marcus A.; CHATTERJEE, Samir. A design science research methodology for information systems research. <b>Journal of management information systems</b>, v. 24, n. 3, p. 45-77, 2007.</p>
+        <p>IEEE. <b>IDS using Deep Learning: A Comprehensive Study</b>. IEEE Article Transactions on Network Security, 2022.</p>
+        <p>JAMES. <b>In-depth exploration of IDS architectures and methodologies</b>. GitHub Repository Publications, 2022.</p>
+        <p>RESEARCHGATE. <b>AI Vs Traditional IDS: Comparative Analysis and Performance Metrics</b>. ResearchGate Network Proceedings, 2020.</p>
+        <p>RESEARCHGATE. <b>Hybrid Intrusion Detection System: Combining ML and Heuristics</b>. ResearchGate Applied Sciences, 2023.</p>
+        <p>RESEARCHGATE. <b>Intrusion Detection System using ML in Cybersecurity</b>. ResearchGate Security Journals, 2021.</p>
+        <p>SARHAN, Mohanad et al. Towards a standard feature set for network intrusion detection system datasets. <b>Mobile Networks and Applications</b>, v. 27, n. 1, p. 357-370, 2022.</p>
+        <p>SPRINGER. <b>Machine Learning and Deep Learning Approaches for Cyber Security</b>. Springer Communications in Computer and Information Science, 2022.</p>
+        <p>WIRES. <b>Optimizing Intrusion Detection for IoT Networks</b>. WIREs Data Mining and Knowledge Discovery, 2023.</p>
+    </div>
+</body>
+</html>

@@ -80,20 +80,36 @@ def run_inference(csv_path: str | None, model_path: str, features_path: str | No
 
     model, mode = load_model_flexible(model_path, device)
 
-    # Prepare mock data (dry-run: não executar, apenas estrutura)
-    # In production the preprocessor would build `x` and `edge_index` from `csv_path`
-    N = 5
-    seq_len = 10
-    num_features = 20
+    if csv_path:
+        import preprocessor as pp
+        try:
+            df = pd.read_csv(csv_path)
+            if not top_features:
+                raise ValueError("O argumento --features é obrigatório ao passar um --data real para a inferência.")
+            
+            df_enc = pp.one_hot_encode(df, ['protocol_type', 'service', 'flag'])
+            data = pp.build_graph(df_enc, top_features, seq_len=10)
+            data_x = data.x.to(device)
+            edges = data.edge_index.to(device)
+            logger.info(f"Dados reais carregados do CSV. Grafo construído com {data.num_nodes} nós e {data.num_edges} arestas.")
+        except Exception as e:
+            logger.error(f"Falha ao processar CSV: {e}")
+            sys.exit(1)
+    else:
+        # Prepare mock data (dry-run: não executar, apenas estrutura)
+        N = 5
+        seq_len = 10
+        num_features = 20
 
-    mock_data_x = torch.randn(N, seq_len, num_features, device=device)
-    mock_edges = torch.tensor([[i for i in range(N-1)], [i+1 for i in range(N-1)]], dtype=torch.long, device=device)
+        data_x = torch.randn(N, seq_len, num_features, device=device)
+        edges = torch.tensor([[i for i in range(N-1)], [i+1 for i in range(N-1)]], dtype=torch.long, device=device)
+        logger.info("Usando tensores mock (aleatórios) para simulação seca.")
 
     with torch.no_grad():
         if mode == 'scripted':
-            logits = model(mock_data_x, mock_edges)
+            logits = model(data_x, edges)
         else:
-            logits = model(mock_data_x, mock_edges)
+            logits = model(data_x, edges)
 
         probs = torch.sigmoid(logits)
 
