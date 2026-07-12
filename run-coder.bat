@@ -1,8 +1,8 @@
 @echo off
-title SPECTRE Coder - AI Terminal Agent
+title SPECTRE Coder - DeepSeek V4 (NVIDIA NIM)
 echo ========================================================
 echo   🚀 INICIANDO AGENTE DE TERMINAL CODER (Aider)
-echo   🧠 Cérebro: Hermes-3 Llama 70B (NVIDIA NIM)
+echo   🧠 Cérebro: DeepSeek V4 Flash (NVIDIA NIM) [TESTADO OK]
 echo   📦 Repositório: ids-cnn-lstm-gnn
 echo ========================================================
 
@@ -21,7 +21,7 @@ if "%NVIDIA_NIM_KEY%"=="" (
 set OPENAI_API_BASE=https://integrate.api.nvidia.com/v1
 set OPENAI_API_KEY=%NVIDIA_NIM_KEY%
 
-:: Executa o Aider com o modelo Hermes-3 (bom raciocínio + seguir instruções)
-:: --auto-commits: cria commits Git automaticamente para cada alteração
-:: --map-tokens: aumenta o mapa de contexto do repositório para 4096 tokens
-aider --model openai/nousresearch/hermes-3-llama-3.1-70b --auto-commits --map-tokens 4096
+:: Executa o Aider com o modelo DeepSeek V4 Flash (confirmado funcionando!)
+:: Para usar o modelo maior (Pro), comente a linha abaixo e descomente a seguinte:
+aider --model openai/deepseek-ai/deepseek-v4-flash --auto-commits --map-tokens 4096
+:: aider --model openai/deepseek-ai/deepseek-v4-pro --auto-commits --map-tokens 4096
