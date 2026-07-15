@@ -6,9 +6,7 @@ Write-Host "Iniciando SPECTRE_GRID (Modo Apresentação ao Vivo)..." -Foreground
 
 # 1. Start FastAPI backend inside WSL (Port 8002)
 Write-Host "[*] Subindo o Servidor FastAPI no WSL..." -ForegroundColor Yellow
-$winPath = (Get-Location).Path
-$wslPath = wsl wslpath -u `"$winPath`"
-$apiJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash -c `"cd '$wslPath' && source .venv_wsl/bin/activate && uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8002`"" -NoNewWindow -PassThru
+$apiJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash -c `"source .venv_wsl/bin/activate && uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8002`"" -NoNewWindow -PassThru
 
 Write-Host "[*] Aguardando o servidor ligar..." -ForegroundColor DarkGray
 Start-Sleep -Seconds 4
