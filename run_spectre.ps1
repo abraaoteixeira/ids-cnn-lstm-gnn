@@ -6,12 +6,12 @@ Write-Host "Starting SPECTRE_GRID v2.0 Environment..." -ForegroundColor Cyan
 
 # 1. Start FastAPI backend inside WSL (on port 8002)
 Write-Host "[*] Starting FastAPI Backend on WSL (Port 8002)..." -ForegroundColor Yellow
-$wslPath = wsl wslpath -u (Get-Location).Path
-$apiJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash -c `"cd $wslPath && source .venv_fast/bin/activate && uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8002`"" -NoNewWindow -PassThru
+$wslPath = wsl wslpath -u `"$((Get-Location).Path)`"
+$apiJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash -c `"cd '$wslPath' && source .venv_wsl/bin/activate && uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8002`"" -NoNewWindow -PassThru
 
 # 2. Start Traffic Simulator inside WSL
 Write-Host "[*] Starting Traffic Simulator on WSL..." -ForegroundColor Yellow
-$simJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash -c `"cd $wslPath && source .venv_fast/bin/activate && python3 traffic_simulator.py`"" -NoNewWindow -PassThru
+$simJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash -c `"cd '$wslPath/tools' && source ../.venv_wsl/bin/activate && python3 traffic_simulator.py`"" -NoNewWindow -PassThru
 
 # Nota: O Port Forwarding (wsl_port_forward.py) foi removido em favor da rede WSL2 mirrored ou acesso direto ao IP do WSL.
 
