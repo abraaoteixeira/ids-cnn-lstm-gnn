@@ -24,6 +24,10 @@ $engineJob = Start-Process wsl -ArgumentList "-d Ubuntu -u root -e bash -c `"$ba
 Write-Host "[*] Iniciando Gerador de Tráfego (Dashboard sempre ativo)..." -ForegroundColor DarkGray
 $trafficJob = Start-Process wsl -ArgumentList "-d Ubuntu -e bash spectre_traffic_gen.sh" -NoNewWindow -PassThru
 
+# 4. Socket Data Feeder (alimenta o Dashboard com eventos JSON via Unix Socket)
+Write-Host "[*] Iniciando Socket Feeder (dados em tempo real no Dashboard)..." -ForegroundColor DarkGray
+$feederJob = Start-Process wsl -ArgumentList "-d Ubuntu -u root -e bash spectre_socket_feeder.sh" -NoNewWindow -PassThru
+
 Write-Host ""
 Write-Host "======================================================" -ForegroundColor Cyan
 Write-Host "[OK] SISTEMA ONLINE! Lendo tráfego real do WSL2." -ForegroundColor Green
@@ -43,6 +47,7 @@ finally {
     if ($apiJob -and -not $apiJob.HasExited) { Stop-Process -Id $apiJob.Id -Force -ErrorAction SilentlyContinue }
     if ($engineJob -and -not $engineJob.HasExited) { Stop-Process -Id $engineJob.Id -Force -ErrorAction SilentlyContinue }
     if ($trafficJob -and -not $trafficJob.HasExited) { Stop-Process -Id $trafficJob.Id -Force -ErrorAction SilentlyContinue }
-    wsl -d Ubuntu -e bash -c "pkill -f spectre_traffic_gen.sh" 2>$null
+    if ($feederJob -and -not $feederJob.HasExited) { Stop-Process -Id $feederJob.Id -Force -ErrorAction SilentlyContinue }
+    wsl -d Ubuntu -e bash -c "pkill -f spectre_traffic_gen.sh ; pkill -f spectre_socket_feeder.sh" 2>$null
     Write-Host "[OK] Encerrado." -ForegroundColor Green
 }
