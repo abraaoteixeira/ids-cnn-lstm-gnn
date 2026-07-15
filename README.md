@@ -138,19 +138,22 @@ Entrada: [Nós, Seq_Len = 10, Features = 20]
 
 ---
 
-## 📁 Estrutura de Arquivos
+## 📁 Estrutura do Repositório (Produção vs Ferramentas)
 
-*   [model.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/model.py): Implementação da rede neural `SPECTRE_GRID`.
-*   [train.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/train.py): Pipeline de treino usando os grafos do PyTorch Geometric `.pt`.
-*   [preprocessor.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/preprocessor.py): Engenharia de dados e seleção automática das **Top-20 Features de Pearson**.
-*   [inference.py](inference.py): Módulo de inferência que processa CSVs reais via `preprocessor.py` (ou tensores mock para dry-run sem dados).
-*   [validate_parity.py](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/validate_parity.py): Compara a coerência de saída entre o código Python e o bytecode LibTorch C++.
-*   [main.cpp](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/main.cpp): Wrapper C++ legado para execução direta do modelo.
-*   [ebpf/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/ebpf): Códigos-fonte do driver Kernel Space (`spectre_xdp.c`), do motor C++ v2 (`loader_fusion_v2.cpp`) e da versão legada (`loader_fusion_legacy.cpp`).
-*   [loader_fusion_rs/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/loader_fusion_rs): Implementação concorrente alternativa em Rust.
-*   [dashboard_go/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/dashboard_go): Backend alternativo em Go de altíssima performance.
-*   [deploy/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/deploy): Scripts de provisionamento automatizado do Systemd daemon para Linux Enterprise.
-*   [scratch/](file:///c:/Users/abraa/Documents/ids-cnn-lstm-gnn/scratch): Scripts utilitários de simulação contínua, estresse de rede (ex: `real_syn_flood.py`, `udp_flood.py`) e controle.
+Para garantir que o repositório seja **Plug-and-Play** em produção (VPS/Cloud), os scripts locais de teste/pesquisa estão isolados da infraestrutura principal do sistema.
+
+*   [ebpf/](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/ebpf): Códigos-fonte do driver Kernel Space (`spectre_xdp.c`), do motor C++ v2 (`loader_fusion_v2.cpp`).
+*   [dashboard_api_v2.py](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/dashboard_api_v2.py): Backend FastAPI oficial de produção (via Unix Sockets).
+*   [dashboard_v2/](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/dashboard_v2): Frontend React/WebGL oficial.
+*   [deploy/](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/deploy): Scripts de provisionamento automatizado, Ansible IaC e Systemd.
+*   [model.py](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/model.py): Definição arquitetural da IA STGNN.
+*   **[tools/](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/tools)**: *NOVO* — Contém todas as ferramentas de simulação e análise (isoladas do ambiente de produção).
+    *   `traffic_simulator.py`: Simulador de tráfego STGNN.
+    *   `analyze_honeypot.py`: Análise de logs brutos do honeypot.
+    *   `stress_test.py`: Estresse de Sockets Unix.
+    *   `validate_parity.py`: Validação de paridade de tensores Python vs C++.
+    *   `generate_*.py`: Geradores de gráficos matplotlib para documentação.
+*   [scratch/](file:///c:/Users/Abraão/Documents/projects/ids-cnn-lstm-gnn/scratch): Scripts utilitários descartáveis de ataque de rede (ex: `real_syn_flood.py`, `udp_flood.py`).
 
 ---
 

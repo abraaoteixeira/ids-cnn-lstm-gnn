@@ -1,6 +1,7 @@
-import json, collections
+import json, collections, os
 
-data = [json.loads(l) for l in open('/mnt/c/Users/abraa/Documents/ids-cnn-lstm-gnn/data/honeypot_real_attacks.jsonl')]
+file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'honeypot_real_attacks.jsonl')
+data = [json.loads(l) for l in open(file_path, encoding='utf-8')]
 print(f'Total eventos: {len(data)}')
 
 # Top IPs
