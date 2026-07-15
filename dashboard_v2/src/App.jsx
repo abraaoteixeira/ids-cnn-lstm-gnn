@@ -455,7 +455,7 @@ function App() {
       {/* Top Header */}
       <header className="top-header">
         <div className="logo-section">
-          <img src="/logo-ifc.png" alt="IFC Logo" style={{ height: '36px', marginRight: '10px' }} />
+          <img src="./logo-ifc.png" alt="IFC Logo" style={{ height: '36px', marginRight: '10px' }} />
           <Shield color="var(--accent-blue)" size={24} />
           <h1>SPECTRE GRID | INTRUSION DETECTION SYSTEM</h1>
         </div>
