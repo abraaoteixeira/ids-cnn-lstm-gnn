@@ -1,0 +1,14 @@
+[Unit]
+Description=SPECTRE_GRID Control Plane (FastAPI IPC)
+After=network.target spectre-fusion.service
+
+[Service]
+Type=simple
+User=spectre
+WorkingDirectory=/opt/spectre-grid
+ExecStart=/opt/spectre-grid/.venv_wsl/bin/uvicorn dashboard_api_v2:app --host 0.0.0.0 --port 8001
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

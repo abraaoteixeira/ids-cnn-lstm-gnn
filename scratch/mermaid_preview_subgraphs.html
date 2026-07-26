@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        #diagram {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="diagram" class="mermaid">
+graph TD
+    %% Estilização
+    classDef kernel fill:#f96,stroke:#333,stroke-width:2px;
+    classDef daemon fill:#69c,stroke:#333,stroke-width:2px;
+    classDef api fill:#4db6ac,stroke:#333,stroke-width:2px;
+    classDef view fill:#ff8a80,stroke:#333,stroke-width:2px;
+
+    subgraph Kernel Space [Kernel Space - eBPF / XDP]
+        B(Kernel space: eBPF / XDP prog):::kernel
+        C{XDP_DROP}:::kernel
+        D[Kernel LRU Map: flow_map]:::kernel
+    end
+
+    subgraph User Space [User Space Daemon]
+        E(loader_fusion Daemon):::daemon
+        F[Ring Buffer: Shape 10x20]:::daemon
+        G{Decisão de Ameaça}:::daemon
+        H[block_map Updater]:::daemon
+    end
+
+    subgraph Control Plane [Control Plane & Telemetria]
+        I(IPC Unix Domain Socket)
+        J(FastAPI Server: dashboard_api.py):::api
+        L[(SQLite: spectre_history.db)]:::api
+        K[Dashboard Topology: app.js]:::view
+    end
+
+    A[Tráfego de Rede] -->|Filtro de Driver| B
+    B -->|IP na Blacklist| C
+    B -->|IP Seguro: Métricas| D
+    
+    D -->|Leitura Atômica| E
+    E -->|Welford Z-Score| F
+    F -->|Inferência LibTorch| G
+    G -->|Probabilidade > 95%| H
+    H -->|Mitigação Atômica| B
+    G -->|Alerta / Telemetria| I
+    
+    I -->|Escuta IPC| J
+    J -->|Persistência| L
+    J -->|WebSockets Live| K
+    </div>
+</body>
+</html>

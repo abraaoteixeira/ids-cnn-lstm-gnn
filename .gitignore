@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv_wsl/
+venv/
+env/
+
+# Node
+node_modules/
+
+# Build & Binaries
+build/
+*.exe
+*.zip
+*.log
+*.db
+
+# OS
+.DS_Store
+Thumbs.db

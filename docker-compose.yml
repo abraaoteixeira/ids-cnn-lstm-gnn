@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - /var/run/spectre:/var/run/spectre
+    environment:
+      - SPECTRE_SOCKET_PATH=/var/run/spectre/spectre.sock
+      - PFSENSE_ENABLED=${PFSENSE_ENABLED:-false}
+      - PFSENSE_HOST=${PFSENSE_HOST}
+      - PFSENSE_USER=${PFSENSE_USER}
+      - PFSENSE_PASS=${PFSENSE_PASS}
+      - PFSENSE_INTERFACE=${PFSENSE_INTERFACE:-wan}
+      - PFSENSE_METHOD=${PFSENSE_METHOD:-ssh}
+      - PFSENSE_SSH_KEY_PATH=${PFSENSE_SSH_KEY_PATH}
+    restart: always
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always

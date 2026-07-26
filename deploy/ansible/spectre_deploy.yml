@@ -1,0 +1,205 @@
+---
+- name: Deploy SPECTRE GRID Infrastructure
+  hosts: all
+  become: yes
+  vars:
+    project_root: /opt/spectre-grid
+    libtorch_version: 2.0.1
+    libtorch_url: "https://download.pytorch.org/libtorch/cpu/libtorch-cxx11-abi-shared-with-deps-{{ libtorch_version }}%2Bcpu.zip"
+    libtorch_dest: /opt
+    node_version: "20.x"
+
+  tasks:
+    - name: Update apt cache and install packages
+      ansible.builtin.apt:
+        update_cache: yes
+        name:
+          - clang
+          - llvm
+          - libbpf-dev
+          - build-essential
+          - pkg-config
+          - cmake
+          - libelf-dev
+          - zlib1g-dev
+          - unzip
+          - git
+        state: present
+
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add NodeSource GPG key
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+        dest: /etc/apt/keyrings/nodesource.asc
+        mode: '0644'
+
+    - name: Add NodeSource repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_{{ node_version }} nodistro main"
+        state: present
+        update_cache: yes
+        filename: nodesource
+
+    - name: Install Node.js and npm
+      ansible.builtin.apt:
+        name:
+          - nodejs
+          - npm
+        state: present
+
+    - name: Install Python3 and virtualenv dependencies
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - python3-dev
+        state: present
+
+    - name: Download LibTorch CPU zip
+      ansible.builtin.get_url:
+        url: "{{ libtorch_url }}"
+        dest: /tmp/libtorch.zip
+        mode: '0644'
+
+    - name: Unarchive LibTorch to destination
+      ansible.builtin.unarchive:
+        src: /tmp/libtorch.zip
+        dest: "{{ libtorch_dest }}"
+        remote_src: yes
+        creates: "{{ libtorch_dest }}/libtorch"
+
+    - name: Create spectre system group
+      ansible.builtin.group:
+        name: spectre
+        state: present
+
+    - name: Create spectre system user
+      ansible.builtin.user:
+        name: spectre
+        group: spectre
+        system: yes
+        create_home: no
+        shell: /usr/sbin/nologin
+
+    - name: Create /var/run/spectre directory
+      ansible.builtin.file:
+        path: /var/run/spectre
+        state: directory
+        owner: spectre
+        group: spectre
+        mode: '0755'
+
+    - name: Ensure project root directory exists
+      ansible.builtin.file:
+        path: "{{ project_root }}"
+        state: directory
+        owner: spectre
+        group: spectre
+        mode: '0755'
+
+    - name: Deploy/Sync the codebase to project root (synchronize)
+      ansible.posix.synchronize:
+        src: "{{ playbook_dir }}/../../"
+        dest: "{{ project_root }}/"
+        recursive: yes
+        delete: yes
+        rsync_opts:
+          - "--exclude=.venv"
+          - "--exclude=.venv_wsl"
+          - "--exclude=build"
+          - "--exclude=node_modules"
+          - "--exclude=__pycache__"
+          - "--exclude=.git"
+      ignore_errors: yes
+      register: sync_result
+
+    - name: Fallback copy codebase if synchronize fails
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../"
+        dest: "{{ project_root }}/"
+        owner: spectre
+        group: spectre
+        mode: '0755'
+      when: sync_result.failed | default(false)
+
+    - name: Create Python virtual environment and install requirements
+      ansible.builtin.pip:
+        requirements: "{{ project_root }}/requirements.txt"
+        virtualenv: "{{ project_root }}/.venv_wsl"
+        virtualenv_command: python3 -m venv
+
+    - name: Ensure correct ownership of virtualenv
+      ansible.builtin.file:
+        path: "{{ project_root }}/.venv_wsl"
+        state: directory
+        owner: spectre
+        group: spectre
+        recurse: yes
+
+    - name: Create build directory for C++ motor v2
+      ansible.builtin.file:
+        path: "{{ project_root }}/build"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Run cmake configuration
+      ansible.builtin.command:
+        cmd: cmake -DCMAKE_PREFIX_PATH=/opt/libtorch/libtorch -DCMAKE_BUILD_TYPE=Release ..
+        chdir: "{{ project_root }}/build"
+
+    - name: Compile C++ motor v2 targets
+      ansible.builtin.shell:
+        cmd: make -j$(nproc)
+        chdir: "{{ project_root }}/build"
+
+    - name: Run npm install for dashboard
+      ansible.builtin.command:
+        cmd: npm install
+        chdir: "{{ project_root }}/dashboard_v2"
+
+    - name: Build Vite frontend dashboard
+      ansible.builtin.command:
+        cmd: npm run build
+        chdir: "{{ project_root }}/dashboard_v2"
+
+    - name: Ensure static directory is symlinked to dashboard_v2 dist
+      ansible.builtin.file:
+        src: "{{ project_root }}/dashboard_v2/dist"
+        dest: "{{ project_root }}/static"
+        state: link
+        force: yes
+        owner: spectre
+        group: spectre
+
+    - name: Copy systemd service files
+      ansible.builtin.copy:
+        src: "{{ project_root }}/deploy/systemd/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        remote_src: yes
+        mode: '0644'
+      loop:
+        - spectre-api.service
+        - spectre-fusion.service
+        - spectre-web.service
+
+    - name: Reload systemd manager configuration
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and restart services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: restarted
+      loop:
+        - spectre-fusion
+        - spectre-api
+        - spectre-web

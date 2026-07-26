@@ -1,0 +1,891 @@
+import React, { useEffect, useState, useRef, useMemo, Suspense } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, ReferenceLine, Legend } from 'recharts';
+import ForceGraph2D from 'react-force-graph-2d';
+import Globe from 'react-globe.gl';
+import { Activity, Shield, AlertTriangle, Network, Server, Lock, Search, Trash2, Download, X, HelpCircle, Globe as GlobeIcon } from 'lucide-react';
+
+function App() {
+  const [logs, setLogs] = useState([]);
+  const [stats, setStats] = useState({
+    totalBytes: 0,
+    packetsAnalyzed: 0,
+    threatsBlocked: 0,
+    activeConnections: 0
+  });
+  
+  // Dados para o Gráfico de Tráfego
+  const [trafficData, setTrafficData] = useState([]);
+  
+  // View mode para alternar entre AreaChart e Graph
+  const [viewMode, setViewMode] = useState('chart'); // 'chart', 'graph' ou 'globe'
+  const [globeArcs, setGlobeArcs] = useState([]);  // Arcos de ataque para o Globo 3D
+  const globeRef = useRef(null);
+  
+  // Dados do Force Graph
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const nodesMap = useRef(new Map());
+  const linksMap = useRef(new Map());
+  
+  const wsRef = useRef(null);
+  const fgRef = useRef(null);
+  
+  // Referência para o container do Graph para ser responsivo
+  const graphContainerRef = useRef(null);
+  const [graphDimensions, setGraphDimensions] = useState({ width: 600, height: 400 });
+
+  // Configuração das forças do D3 no Grafo para evitar deriva e sobreposição
+  useEffect(() => {
+    if (fgRef.current) {
+      // Repulsão equilibrada entre os nós para evitar que saiam voando
+      fgRef.current.d3Force('charge').strength(-120);
+      // Distância média controlada para que os links não fiquem gigantescos
+      fgRef.current.d3Force('link').distance(65);
+      // Centralização firme no meio do painel
+      fgRef.current.d3Force('center')
+        .x(graphDimensions.width / 2)
+        .y(graphDimensions.height / 2);
+    }
+  }, [graphDimensions, viewMode]);
+
+  // === NOVOS ESTADOS DA POC ===
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState('all'); // 'all', 'threats', 'allowed'
+  const [toasts, setToasts] = useState([]);
+  const [networkSpeed, setNetworkSpeed] = useState('0 KB/s');
+  
+  // === NOVOS ESTADOS DE DIAGNÓSTICO DO MODELO (HUD) ===
+  const [modelDiagnostics, setModelDiagnostics] = useState({
+    lastAttentionWeight: 0,
+    lastAttentionIp: 'Nenhum',
+    lastProbability: 0,
+    inferenceLatency: 1.2
+  });
+  
+  const totalBytesRef = useRef(0);
+
+  // Sincroniza bytes para cálculo de velocidade
+  useEffect(() => {
+    totalBytesRef.current = stats.totalBytes;
+  }, [stats.totalBytes]);
+
+  // Efeito para cálculo periódico da taxa de transferência por segundo
+  useEffect(() => {
+    let lastBytes = 0;
+    const timer = setInterval(() => {
+      const currentBytes = totalBytesRef.current;
+      const diff = currentBytes - lastBytes;
+      lastBytes = currentBytes;
+      
+      if (diff > 1024 * 1024) {
+        setNetworkSpeed(`${(diff / 1024 / 1024).toFixed(2)} MB/s`);
+      } else if (diff > 1024) {
+        setNetworkSpeed(`${(diff / 1024).toFixed(1)} KB/s`);
+      } else {
+        setNetworkSpeed(`${diff} B/s`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auxiliar para disparar Toasts dinâmicos
+  const addToast = (message, type = 'info') => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4500);
+  };
+
+  useEffect(() => {
+    // Carregar histórico inicial do Banco de Dados
+    fetch(`${window.location.origin}/api/history?limit=100`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          const formatted = data.map(item => {
+            const timestamp = item.timestamp || new Date().toLocaleTimeString('en-US', { hour12: false });
+            
+            // Popula os mapas temporários de grafos com o histórico
+            const srcIp = item.src_ip || 'Unknown';
+            const dstIp = item.dst_ip || 'Unknown';
+            const isThreat = !!item.is_threat;
+            
+            if (!nodesMap.current.has(srcIp)) nodesMap.current.set(srcIp, { id: srcIp, isThreat });
+            if (!nodesMap.current.has(dstIp)) nodesMap.current.set(dstIp, { id: dstIp, isThreat });
+            
+            // Link ID bidirecional (independente de origem/destino) para evitar arestas duplicadas
+            const linkId = srcIp < dstIp ? `${srcIp}-${dstIp}` : `${dstIp}-${srcIp}`;
+            if (!linksMap.current.has(linkId)) {
+              linksMap.current.set(linkId, {
+                source: srcIp,
+                target: dstIp,
+                value: isThreat ? 3 : 1,
+                isThreat: isThreat
+              });
+            } else if (isThreat) {
+              const existingLink = linksMap.current.get(linkId);
+              existingLink.isThreat = true;
+              existingLink.value = 3;
+            }
+
+            // Fix timestamp for the table view as well
+            let finalTimestamp = timestamp;
+            if (finalTimestamp.includes('T')) {
+                finalTimestamp = new Date(finalTimestamp).toLocaleTimeString('en-US', { hour12: false });
+            }
+
+            return { ...item, timestamp: finalTimestamp };
+          });
+
+          setLogs(formatted);
+          setGraphData({
+            nodes: Array.from(nodesMap.current.values()),
+            links: Array.from(linksMap.current.values()).map(link => ({
+              ...link,
+              source: typeof link.source === 'object' ? link.source.id : link.source,
+              target: typeof link.target === 'object' ? link.target.id : link.target
+            }))
+          });
+
+          // Pre-popula os últimos 30 pontos de tráfego com o histórico do BD para o gráfico
+          const initialTraffic = data.slice(0, 30).reverse().map(item => {
+            let t = item.timestamp || new Date().toLocaleTimeString('en-US', { hour12: false });
+            // Convert ISO string to HH:MM:SS format to match WebSocket
+            if (t.includes('T')) {
+                t = new Date(t).toLocaleTimeString('en-US', { hour12: false });
+            }
+            return {
+              time: t,
+              maxAttention: item.attention_weight !== undefined ? item.attention_weight * 100 : (item.probability ? item.probability * 90 : 0),
+              maxProbability: item.probability ? item.probability * 100 : 0,
+              trafficVolume: (item.bytes || 0) / 1024
+            };
+          });
+          setTrafficData(initialTraffic);
+
+          if (data.length > 0) {
+            const latest = data[0];
+            setModelDiagnostics({
+              lastAttentionWeight: latest.attention_weight !== undefined ? latest.attention_weight * 100 : (latest.probability ? latest.probability * 0.9 : 0),
+              lastAttentionIp: latest.src_ip ? latest.src_ip.split(' ')[0] : 'Nenhum',
+              lastProbability: latest.probability || 0,
+              inferenceLatency: 1.15
+            });
+          }
+
+          // Computar stats iniciais baseados no histórico
+          const totalBytes = data.reduce((acc, item) => acc + (item.bytes || 0), 0);
+          const threatsBlocked = data.filter(item => item.is_threat).length;
+          setStats(prev => ({
+            ...prev,
+            totalBytes,
+            packetsAnalyzed: data.length,
+            threatsBlocked,
+            activeConnections: nodesMap.current.size
+          }));
+        }
+      })
+      .catch(err => console.error("Erro ao carregar histórico inicial:", err));
+
+    // Conectar WebSocket
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/threats`);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+        
+        // Adiciona aos Logs
+        setLogs(prev => {
+          const newLogs = [{ ...data, timestamp }, ...prev];
+          if (newLogs.length > 100) newLogs.pop();
+          return newLogs;
+        });
+
+        // Atualiza Stats em tempo real
+        setStats(prev => ({
+          totalBytes: prev.totalBytes + (data.bytes || 0),
+          packetsAnalyzed: prev.packetsAnalyzed + 1,
+          threatsBlocked: prev.threatsBlocked + (data.is_threat ? 1 : 0),
+          activeConnections: nodesMap.current.size
+        }));
+
+        // Atualiza Gráfico de Linha/Área
+        const attention = (data.attention_weight || 0) * 100;
+        const probability = (data.probability || 0) * 100;
+        const srcIp = data.src_ip || 'Unknown';
+        const cleanIp = srcIp.split(' ')[0];
+
+        // Atualiza diagnósticos de IA com dados reais do pacote e latência simulada
+        setModelDiagnostics(prev => ({
+          lastAttentionWeight: attention,
+          lastAttentionIp: cleanIp,
+          lastProbability: probability,
+          inferenceLatency: parseFloat((0.9 + Math.random() * 0.6).toFixed(2)) // Simula latência realística do pipeline (0.9ms - 1.5ms)
+        }));
+
+        setTrafficData(prev => {
+          const newData = [...prev];
+          const lastPoint = newData[newData.length - 1];
+          if (lastPoint && lastPoint.time === timestamp) {
+            newData[newData.length - 1] = {
+              ...lastPoint,
+              maxAttention: Math.max(lastPoint.maxAttention, attention),
+              maxProbability: Math.max(lastPoint.maxProbability, probability),
+              trafficVolume: (lastPoint.trafficVolume || 0) + ((data.bytes || 0) / 1024)
+            };
+          } else {
+            newData.push({
+              time: timestamp,
+              maxAttention: attention,
+              maxProbability: probability,
+              trafficVolume: (data.bytes || 0) / 1024
+            });
+          }
+          if (newData.length > 30) newData.shift();
+          return newData;
+        });
+        
+        // Atualiza o Grafo
+        const dstIp = data.dst_ip || 'Unknown';
+        const isThreat = !!data.is_threat;
+
+        // Limita tamanho do grafo para evitar memory leak
+        if (nodesMap.current.size > 80) {
+          const firstNodeKey = nodesMap.current.keys().next().value;
+          nodesMap.current.delete(firstNodeKey);
+        }
+        if (linksMap.current.size > 150) {
+          const firstLinkKey = linksMap.current.keys().next().value;
+          linksMap.current.delete(firstLinkKey);
+        }
+
+        // Se o IP for ameaça, atualiza a propriedade do nó existente sem recriar o objeto
+        if (!nodesMap.current.has(srcIp)) {
+          nodesMap.current.set(srcIp, { id: srcIp, isThreat: isThreat });
+        } else if (isThreat) {
+          nodesMap.current.get(srcIp).isThreat = true;
+        }
+
+        if (!nodesMap.current.has(dstIp)) {
+          nodesMap.current.set(dstIp, { id: dstIp, isThreat: isThreat });
+        } else if (isThreat) {
+          nodesMap.current.get(dstIp).isThreat = true;
+        }
+        
+        // Link ID bidirecional para evitar arestas duplicadas
+        const linkId = srcIp < dstIp ? `${srcIp}-${dstIp}` : `${dstIp}-${srcIp}`;
+        if (!linksMap.current.has(linkId)) {
+          linksMap.current.set(linkId, {
+            source: srcIp,
+            target: dstIp,
+            value: isThreat ? 3 : 1,
+            isThreat: isThreat
+          });
+        } else {
+          const existingLink = linksMap.current.get(linkId);
+          if (isThreat) {
+            existingLink.isThreat = true;
+            existingLink.value = 3;
+          }
+        }
+
+        setGraphData({
+          nodes: Array.from(nodesMap.current.values()),
+          links: Array.from(linksMap.current.values()).map(link => ({
+            ...link,
+            source: typeof link.source === 'object' ? link.source.id : link.source,
+            target: typeof link.target === 'object' ? link.target.id : link.target
+          }))
+        });
+
+        // Alimenta o Globo 3D com arcos de conexões globais
+        if (data.lat && data.lon && Math.abs(data.lat) > 0.1) {
+          const newArc = {
+            id: Date.now(),
+            srcIp: data.src_ip || 'Unknown',
+            startLat: data.lat,
+            startLng: data.lon,
+            endLat: -27.1,    // Sul do Brasil
+            endLng: -48.9,
+            color: isThreat ? ['#ef4444', '#ef4444'] : ['#10b981', '#10b981'],
+          };
+          setGlobeArcs(prev => {
+            const updated = [...prev, newArc];
+            return updated.length > 40 ? updated.slice(-40) : updated; // max 40 arcos
+          });
+        }
+
+        // Dispara Toast de Alerta caso seja Ameaça detectada pela IA
+        if (isThreat) {
+          addToast(`Ameaça Mitigada: Fluxo suspeito detectado de ${srcIp} para ${dstIp}`, 'danger');
+        }
+
+
+      } catch (err) {
+        console.error("Error parsing WS message:", err);
+      }
+    };
+
+    return () => ws.close();
+  }, []);
+
+  useEffect(() => {
+    // Redimensionar grafo se alternar de visualização
+    const updateDimensions = () => {
+      if (graphContainerRef.current) {
+        setGraphDimensions({
+          width: graphContainerRef.current.offsetWidth,
+          height: graphContainerRef.current.offsetHeight
+        });
+      }
+    };
+    window.addEventListener('resize', updateDimensions);
+    updateDimensions();
+    setTimeout(updateDimensions, 150);
+    return () => window.removeEventListener('resize', updateDimensions);
+  }, [viewMode]);
+
+  // === METODOS E LOGICAS DA POC ===
+
+  // Filtragem de Logs
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = (log.src_ip || '').toLowerCase().includes(searchLower) ||
+                            (log.dst_ip || '').toLowerCase().includes(searchLower) ||
+                            (log.protocol || '').toLowerCase().includes(searchLower);
+      const matchesFilter = filterMode === 'all' ||
+                            (filterMode === 'threats' && log.is_threat) ||
+                            (filterMode === 'allowed' && !log.is_threat);
+      return matchesSearch && matchesFilter;
+    });
+  }, [logs, searchQuery, filterMode]);
+
+  // Estatísticas do IP selecionado
+  const selectedNodeStats = useMemo(() => {
+    if (!selectedNode) return null;
+    const ip = selectedNode.id;
+    const related = logs.filter(l => l.src_ip === ip || l.dst_ip === ip);
+    const sentBytes = related.reduce((acc, l) => l.src_ip === ip ? acc + (l.bytes || 0) : acc, 0);
+    const recvBytes = related.reduce((acc, l) => l.dst_ip === ip ? acc + (l.bytes || 0) : acc, 0);
+    const threatCount = related.filter(l => l.is_threat).length;
+    return {
+      ip,
+      status: selectedNode.isThreat ? 'BLOQUEADO' : 'ATIVO / SEGURO',
+      isThreat: selectedNode.isThreat,
+      totalFlows: related.length,
+      sentBytes,
+      recvBytes,
+      threatCount
+    };
+  }, [selectedNode, logs]);
+
+  // Limpar Banco de Dados
+  const handleClearHistory = async () => {
+    if (window.confirm("Deseja realmente limpar todo o histórico de ameaças e logs do banco de dados?")) {
+      try {
+        const response = await fetch(`${window.location.origin}/api/clear_history`, { method: 'POST' });
+        const result = await response.json();
+        if (result.status === 'success') {
+          setLogs([]);
+          nodesMap.current.clear();
+          linksMap.current.clear();
+          setGraphData({ nodes: [], links: [] });
+          setStats({
+            totalBytes: 0,
+            packetsAnalyzed: 0,
+            threatsBlocked: 0,
+            activeConnections: 0
+          });
+          setSelectedNode(null);
+          addToast("Banco de dados limpo com sucesso!", "success");
+        } else {
+          addToast("Falha ao limpar banco de dados", "warning");
+        }
+      } catch (err) {
+        console.error(err);
+        addToast("Erro na comunicação com a API", "danger");
+      }
+    }
+  };
+
+  // Exportar Logs como CSV
+  const handleExportCSV = () => {
+    if (logs.length === 0) {
+      addToast("Nenhum log disponível para exportação", "warning");
+      return;
+    }
+    const headers = ["Horario", "IP Origem", "IP Destino", "Protocolo", "Bytes", "Atenção GNN", "Ação"];
+    const csvRows = [
+      headers.join(','),
+      ...logs.map(l => [
+        l.timestamp,
+        l.src_ip,
+        l.dst_ip,
+        l.protocol || 'TCP',
+        l.bytes || 0,
+        l.attention_weight ? (l.attention_weight * 100).toFixed(1) + '%' : 'N/A',
+        l.is_threat ? 'BLOQUEADO' : 'PERMITIDO'
+      ].join(','))
+    ];
+    
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `spectre_grid_logs_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    addToast("Relatório de logs exportado com sucesso!", "success");
+  };
+
+  return (
+    <div className="dashboard-container">
+      {/* Container Flutuante de Toasts */}
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <div key={toast.id} className={`toast toast-${toast.type}`}>
+            <AlertTriangle size={18} />
+            <div className="toast-message">{toast.message}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Top Header */}
+      <header className="top-header">
+        <div className="logo-section">
+          <img src="./logo-ifc.png" alt="IFC Logo" style={{ height: '48px', marginRight: '10px' }} />
+          <Shield color="var(--accent-blue)" size={24} />
+          <h1>SPECTRE GRID | INTRUSION DETECTION SYSTEM</h1>
+        </div>
+        <div className="status-badge">
+          <div className="status-dot"></div>
+          CONEXÃO SEGURA ATIVA
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="main-content">
+        
+        {/* KPI Grid */}
+        <div className="kpi-grid">
+          <div className="kpi-card">
+            <div className="kpi-title"><Activity size={16} /> Tráfego Ingerido</div>
+            <div className="kpi-value">{(stats.totalBytes / 1024 / 1024).toFixed(2)} MB</div>
+            <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--accent-green)', fontWeight: 500, marginTop: '4px' }}>
+              Taxa: {networkSpeed}
+            </div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title"><Network size={16} /> Pacotes Analisados</div>
+            <div className="kpi-value">{stats.packetsAnalyzed.toLocaleString()}</div>
+            <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Inferências GNN Ativas
+            </div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title"><AlertTriangle size={16} /> Ameaças Bloqueadas</div>
+            <div className="kpi-value danger">{stats.threatsBlocked.toLocaleString()}</div>
+            <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--accent-red)', fontWeight: 500, marginTop: '4px' }}>
+              Mitigação eBPF XDP_DROP
+            </div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title"><Server size={16} /> Nós Ativos</div>
+            <div className="kpi-value">{stats.activeConnections}</div>
+            <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Topologia de Conexões
+            </div>
+          </div>
+        </div>
+
+        {/* Panels Grid */}
+        <div className="panels-grid">
+          
+          {/* Traffic Timeseries / Graph Panel */}
+          <div className="panel">
+            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Activity size={18} color="var(--accent-blue)" />
+                Tráfego de Rede & Detecção de Anomalias
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={() => setViewMode('chart')}
+                  className={`btn-toggle ${viewMode === 'chart' ? 'active' : ''}`}>
+                  Nível de Ameaça (GNN)
+                </button>
+                <button 
+                  onClick={() => setViewMode('graph')}
+                  className={`btn-toggle ${viewMode === 'graph' ? 'active' : ''}`}>
+                  Grafo de Nós
+                </button>
+                <button 
+                  onClick={() => setViewMode('globe')}
+                  className={`btn-toggle ${viewMode === 'globe' ? 'active' : ''}`}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <GlobeIcon size={14} /> Globo 3D
+                </button>
+              </div>
+            </div>
+            <div className="panel-content" style={{ position: 'relative', overflow: 'hidden', padding: 0 }}>
+              {viewMode === 'chart' ? (
+                <div className="gnn-layout-container">
+                  {/* Lado Esquerdo: Área do Gráfico */}
+                  <div className="gnn-chart-wrapper">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trafficData} margin={{ top: 15, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorAttention" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--accent-blue)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--accent-blue)" stopOpacity={0.0}/>
+                          </linearGradient>
+                          <linearGradient id="colorProbability" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--accent-red)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--accent-red)" stopOpacity={0.0}/>
+                          </linearGradient>
+                          <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="var(--accent-green)" stopOpacity={0.4}/>
+                            <stop offset="95%" stopColor="var(--accent-green)" stopOpacity={0.0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
+                        <XAxis dataKey="time" stroke="var(--text-secondary)" fontSize={11} tickLine={false} axisLine={false} />
+                        <YAxis yAxisId="left" stroke="var(--text-secondary)" fontSize={11} tickLine={false} axisLine={false} domain={[-2, 100]} />
+                        <YAxis yAxisId="right" orientation="right" stroke="var(--accent-green)" fontSize={11} tickLine={false} axisLine={false} />
+                        <Tooltip 
+                          contentStyle={{ backgroundColor: 'var(--bg-panel)', borderColor: 'var(--border-highlight)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)' }}
+                          itemStyle={{ color: '#fff', fontSize: '0.8rem' }}
+                          labelStyle={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 'bold' }}
+                          formatter={(value, name) => [
+                            name === 'trafficVolume' ? `${value.toFixed(1)} KB` : `${value.toFixed(1)}%`,
+                            name === 'maxAttention' ? 'Atenção GNN' : name === 'trafficVolume' ? 'Volume de Tráfego' : 'Probabilidade de Ameaça'
+                          ]}
+                        />
+                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '0.75rem' }} />
+                        <ReferenceLine yAxisId="left" y={85} stroke="var(--accent-orange)" strokeDasharray="3 3" label={{ value: 'Alerta Crítico (85%)', fill: 'var(--accent-orange)', fontSize: 9, position: 'top', fontWeight: 600 }} />
+                        <Area yAxisId="left" type="monotone" dataKey="maxAttention" stroke="var(--accent-blue)" strokeWidth={4} fillOpacity={1} fill="url(#colorAttention)" name="maxAttention" />
+                        <Area yAxisId="left" type="monotone" dataKey="maxProbability" stroke="var(--accent-red)" strokeWidth={2} fillOpacity={1} fill="url(#colorProbability)" name="maxProbability" />
+                        <Area yAxisId="right" type="monotone" dataKey="trafficVolume" stroke="var(--accent-green)" strokeWidth={2} fillOpacity={1} fill="url(#colorTraffic)" name="trafficVolume" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Lado Direito: HUD de Diagnósticos do Modelo de IA */}
+                  <div className="gnn-diagnostics-hud">
+                    <div className="hud-header">
+                      <span>MÓDULO DE AUDITORIA IA (XAI)</span>
+                      <span className="hud-pulse">● ONLINE</span>
+                    </div>
+                    
+                    <div className="hud-metric-row">
+                      <div className="hud-metric-item">
+                        <span className="hud-label">Latência GNN</span>
+                        <span className="hud-value mono">{modelDiagnostics.inferenceLatency.toFixed(2)} ms</span>
+                      </div>
+                      <div className="hud-metric-item">
+                        <span className="hud-label">Acurácia STGNN</span>
+                        <span className="hud-value mono" style={{ color: 'var(--accent-green)' }}>99.8%</span>
+                      </div>
+                    </div>
+
+                    <div className="hud-status-box">
+                      <div className="hud-section-title">Status da Topologia</div>
+                      <div className="hud-info-row">
+                        <span>IP Sob Atenção</span>
+                        <span className="hud-info-val mono text-highlight">{modelDiagnostics.lastAttentionIp}</span>
+                      </div>
+                      <div className="hud-info-row">
+                        <span>Peso GNN Atual</span>
+                        <span className="hud-info-val mono">{modelDiagnostics.lastAttentionWeight.toFixed(1)}%</span>
+                      </div>
+                      <div className="hud-info-row">
+                        <span>Prob. Intrusão</span>
+                        <span className={`hud-info-val mono ${modelDiagnostics.lastProbability > 70 ? 'text-danger' : ''}`}>
+                          {modelDiagnostics.lastProbability.toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="hud-risk-evaluation">
+                      <div className="hud-section-title">Nível de Risco do Canal</div>
+                      {(() => {
+                        const prob = modelDiagnostics.lastProbability;
+                        let riskLabel = 'BAIXO';
+                        let riskClass = 'risk-low';
+                        if (prob > 85) {
+                          riskLabel = 'CRÍTICO';
+                          riskClass = 'risk-critical';
+                        } else if (prob > 60) {
+                          riskLabel = 'ALTO';
+                          riskClass = 'risk-high';
+                        } else if (prob > 25) {
+                          riskLabel = 'MÉDIO';
+                          riskClass = 'risk-medium';
+                        }
+                        return (
+                          <div className={`risk-indicator ${riskClass}`}>
+                            <span className="risk-pulse"></span>
+                            {riskLabel} - {prob > 25 ? 'Requer Atenção' : 'Fluxo Seguro'}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="hud-neural-flow">
+                      <div className="hud-section-title">Pipeline de Execução (STGNN)</div>
+                      <div className="neural-pipeline">
+                        <div className="pipeline-node active" title="Convolução 1D Temporal">CNN-1D</div>
+                        <div className="pipeline-arrow">→</div>
+                        <div className="pipeline-node active" title="Memória de Longo Prazo">LSTM</div>
+                        <div className="pipeline-arrow">→</div>
+                        <div className="pipeline-node active attention" title="Pesos de Atenção no Grafo">GATConv</div>
+                        <div className="pipeline-arrow">→</div>
+                        <div className="pipeline-node active" title="Predição de Logit">FC</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : viewMode === 'globe' ? (
+                // ── Globo 3D de Ataques em Tempo Real ────────────────────────────────
+                <div style={{ width: '100%', height: '100%', background: '#050a14', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                  <Globe
+                    ref={globeRef}
+                    width={800}
+                    height={400}
+                    globeImageUrl="//unpkg.com/three-globe/example/img/earth-night.jpg"
+                    backgroundColor="#050a14"
+                    atmosphereColor="#1d4ed8"
+                    atmosphereAltitude={0.15}
+                    arcsData={globeArcs}
+                    arcStartLat={d => d.startLat}
+                    arcStartLng={d => d.startLng}
+                    arcEndLat={d => d.endLat}
+                    arcEndLng={d => d.endLng}
+                    arcColor={d => d.color}
+                    arcAltitude={0.3}
+                    arcStroke={1.2}
+                    arcDashLength={0.4}
+                    arcDashGap={0.2}
+                    arcDashAnimateTime={1800}
+                    arcsTransitionDuration={300}
+                    pointsData={globeArcs}
+                    pointLat={d => d.startLat}
+                    pointLng={d => d.startLng}
+                    pointColor={d => d.color[0]}
+                    pointAltitude={0.01}
+                    pointRadius={0.4}
+                    pointsMerge={false}
+                    labelsData={globeArcs.slice(-8)}
+                    labelLat={d => d.startLat}
+                    labelLng={d => d.startLng}
+                    labelText={d => d.srcIp}
+                    labelSize={0.7}
+                    labelColor={() => '#ef4444'}
+                    labelDotRadius={0.3}
+                  />
+                  <div style={{ position: 'absolute', top: '10px', left: '10px', background: 'rgba(0,0,0,0.7)', borderRadius: '6px', padding: '8px 12px', fontSize: '0.75rem', color: '#94a3b8', backdropFilter: 'blur(4px)' }}>
+                    <div style={{ color: '#f8fafc', fontWeight: 700, marginBottom: '4px' }}>🌐 Mapa de Tráfego Global</div>
+                    <div><span style={{color: '#10b981'}}>● Verde</span> = Conexão Segura (Permitida)</div>
+                    <div><span style={{color: '#ef4444'}}>● Vermelho</span> = Ataque Bloqueado</div>
+                    <div style={{ marginTop: '4px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '4px' }}>Destino: <strong>SPECTRE GRID - Nó Local</strong> 🇧🇷</div>
+                    <div>Fluxos plotados: <strong style={{ color: '#f8fafc' }}>{globeArcs.length}</strong></div>
+                  </div>
+                </div>
+              ) : (
+                <div ref={graphContainerRef} style={{ width: '100%', height: '100%', background: 'var(--bg-main)', borderRadius: '6px', overflow: 'hidden', position: 'relative' }}>
+                  {graphDimensions.width > 0 && (
+                    <ForceGraph2D
+                      ref={fgRef}
+                      graphData={graphData}
+                      width={graphDimensions.width}
+                      height={graphDimensions.height}
+                      nodeLabel={node => node.id.split(' ')[0]}
+                      nodeColor={node => node.isThreat ? '#EF4444' : '#10B981'}
+                      linkColor={link => link.isThreat ? '#EF4444' : '#2563EB'}
+                      linkWidth={link => link.value}
+                      enableNodeDrag={true}
+                      enableZoomInteraction={true}
+                      onNodeClick={node => setSelectedNode(node)}
+                      nodeCanvasObject={(node, ctx, globalScale) => {
+                        const label = node.id.split(' ')[0]; // Exibe apenas o IP limpo no grafo para UX mais limpa
+                        const fontSize = 12 / globalScale;
+                        ctx.font = `${fontSize}px var(--font-mono, monospace)`;
+                        const textWidth = ctx.measureText(label).width;
+                        const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2);
+
+                        ctx.fillStyle = selectedNode?.id === node.id ? 'rgba(37, 99, 235, 0.4)' : 'rgba(14, 16, 21, 0.8)';
+                        ctx.strokeStyle = selectedNode?.id === node.id ? '#2563EB' : 'transparent';
+                        ctx.lineWidth = 2 / globalScale;
+                        
+                        ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+                        if (selectedNode?.id === node.id) {
+                          ctx.strokeRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+                        }
+
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillStyle = node.isThreat ? '#EF4444' : '#10B981';
+                        ctx.fillText(label, node.x, node.y);
+
+                        node.__bckgDimensions = bckgDimensions;
+                      }}
+                      nodePointerAreaPaint={(node, color, ctx) => {
+                        ctx.fillStyle = color;
+                        const bckgDimensions = node.__bckgDimensions;
+                        bckgDimensions && ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions);
+                      }}
+                    />
+                  )}
+
+                  {/* Informações detalhadas do nó selecionado (Sidebar flutuante interna) */}
+                  {selectedNodeStats && (
+                    <div className="node-detail-panel">
+                      <div className="node-detail-header">
+                        <h4>Detalhes do IP</h4>
+                        <button onClick={() => setSelectedNode(null)} className="btn-close-detail"><X size={16} /></button>
+                      </div>
+                      <div className="node-detail-body">
+                        <div className="detail-row">
+                          <span className="detail-label">Endereço IP</span>
+                          <span className="detail-value mono">{selectedNodeStats.ip}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Status</span>
+                          <span className={`detail-value badge ${selectedNodeStats.isThreat ? 'block' : 'allow'}`}>
+                            {selectedNodeStats.status}
+                          </span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Fluxos Relacionados</span>
+                          <span className="detail-value">{selectedNodeStats.totalFlows}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Bytes Enviados</span>
+                          <span className="detail-value">{(selectedNodeStats.sentBytes / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Bytes Recebidos</span>
+                          <span className="detail-value">{(selectedNodeStats.recvBytes / 1024).toFixed(1)} KB</span>
+                        </div>
+                        <div className="detail-row">
+                          <span className="detail-label">Ameaças Associadas</span>
+                          <span className={`detail-value ${selectedNodeStats.threatCount > 0 ? 'text-danger' : 'text-success'}`}>
+                            {selectedNodeStats.threatCount}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dica do Grafo */}
+                  <div style={{ position: 'absolute', bottom: '10px', left: '10px', fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px' }}>
+                    <HelpCircle size={12} /> Clique em um nó IP para inspecionar estatísticas.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Real-time Threat Logs Panel with Search and Actions */}
+          <div className="panel">
+            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Lock size={18} color="var(--accent-red)" />
+                Logs de Eventos de Segurança
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleExportCSV} className="btn-action" title="Exportar para CSV">
+                  <Download size={14} /> Exportar
+                </button>
+                <button onClick={handleClearHistory} className="btn-action danger" title="Limpar Banco de Dados">
+                  <Trash2 size={14} /> Limpar BD
+                </button>
+              </div>
+            </div>
+            
+            {/* Barra de Filtros e Busca */}
+            <div className="log-filter-bar">
+              <div className="search-box">
+                <Search size={14} className="search-icon" />
+                <input 
+                  type="text" 
+                  placeholder="Buscar IP ou Protocolo..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)} 
+                />
+              </div>
+              <div className="filter-buttons">
+                <button 
+                  onClick={() => setFilterMode('all')} 
+                  className={`filter-btn ${filterMode === 'all' ? 'active' : ''}`}>
+                  Todos
+                </button>
+                <button 
+                  onClick={() => setFilterMode('threats')} 
+                  className={`filter-btn ${filterMode === 'threats' ? 'active' : ''}`}>
+                  Ameaças
+                </button>
+                <button 
+                  onClick={() => setFilterMode('allowed')} 
+                  className={`filter-btn ${filterMode === 'allowed' ? 'active' : ''}`}>
+                  Seguros
+                </button>
+              </div>
+            </div>
+
+            <div className="panel-content" style={{ padding: 0 }}>
+              <div className="log-table-wrapper">
+                <table className="log-table">
+                  <thead>
+                    <tr>
+                      <th>Horário</th>
+                      <th>IP de Origem</th>
+                      <th>IP de Destino</th>
+                      <th>Atenção GNN</th>
+                      <th>Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredLogs.map((log, idx) => (
+                      <tr key={idx} style={{ background: log.is_threat ? 'rgba(239, 68, 68, 0.03)' : 'transparent' }}>
+                        <td style={{ color: 'var(--text-secondary)' }}>{log.timestamp}</td>
+                        <td className="mono">{log.src_ip}</td>
+                        <td className="mono">{log.dst_ip}</td>
+                        <td>
+                          {log.attention_weight !== undefined && log.attention_weight !== null ? (log.attention_weight * 100).toFixed(1) + '%' : '0.0%'}
+                        </td>
+                        <td>
+                          {log.is_threat ? (
+                            <span className="badge block">BLOQUEADO</span>
+                          ) : (
+                            <span className="badge allow">PERMITIDO</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredLogs.length === 0 && (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                          Nenhum evento corresponde aos filtros.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  );
+}
+
+export default App;

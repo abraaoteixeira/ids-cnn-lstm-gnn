@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+    </script>
+    <style>
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        #diagram {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="diagram" class="mermaid">
+graph TD
+    %% Estilização
+    classDef kernel fill:#f96,stroke:#333,stroke-width:2px;
+    classDef daemon fill:#69c,stroke:#333,stroke-width:2px;
+    classDef api fill:#4db6ac,stroke:#333,stroke-width:2px;
+    classDef view fill:#ff8a80,stroke:#333,stroke-width:2px;
+
+    A[Tráfego Físico / Virtual] -->|Filtragem de Driver| B(Kernel space: eBPF / XDP prog):::kernel
+    B -->|IP na Blacklist| C{XDP_DROP}:::kernel
+    B -->|IP Seguro: Incrementa Métricas| D[Kernel LRU Map: flow_map]:::kernel
+    
+    D -->|Leitura Atômica Sem Polling| E(User Space Daemon: loader_fusion):::daemon
+    E -->|Normalização de Welford| F[Ring Buffer Temporizado: Shape 10x20]:::daemon
+    F -->|Inferência LibTorch GNN| G{Decisão de Ameaça}:::daemon
+    G -->|Probabilidade > 95%| H[Injeta IP no block_map do Kernel]:::daemon
+    G -->|Alerta / Telemetria| I(IPC Unix Domain Socket)
+    
+    I -->|Escuta de Eventos| J(FastAPI Server: dashboard_api.py):::api
+    J -->|Persistência| L[(SQLite: spectre_history.db)]:::api
+    J -->|WebSockets Live| K[Dashboard Topology: app.js]:::view
+
+    H -->|Bloqueio Atômico| B
+    </div>
+</body>
+</html>

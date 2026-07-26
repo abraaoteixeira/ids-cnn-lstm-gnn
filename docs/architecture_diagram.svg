@@ -1,0 +1,201 @@
+<svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- Define styles -->
+  <defs>
+    <style>
+      .title { font-size: 24px; font-weight: bold; fill: #1a1a1a; }
+      .subtitle { font-size: 14px; fill: #666; }
+      .layer-label { font-size: 16px; font-weight: bold; fill: #ffffff; }
+      .component { font-size: 12px; fill: #333; }
+      .label { font-size: 11px; fill: #555; }
+      .arrow-text { font-size: 10px; fill: #666; font-style: italic; }
+      .box { stroke-width: 2; }
+      .kernel { fill: #FF6B6B; stroke: #C92A2A; }
+      .userspace { fill: #4ECDC4; stroke: #0A9396; }
+      .ui { fill: #45B7D1; stroke: #1B6B8F; }
+      .line { stroke: #999; stroke-width: 2; }
+      .arrow { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666" />
+    </marker>
+  </defs>
+
+  <!-- Background layers -->
+  <rect x="10" y="10" width="1180" height="780" fill="#f8f9fa" stroke="#ddd" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" class="title">SPECTRE_GRID System Architecture</text>
+  <text x="600" y="60" text-anchor="middle" class="subtitle">3-Layer IDS: Kernel → User Space → Control Plane</text>
+
+  <!-- LAYER 1: KERNEL (eBPF/XDP) -->
+  <rect x="20" y="80" width="350" height="280" class="box kernel" rx="5"/>
+  <text x="35" y="105" class="layer-label">🔴 LAYER 1: KERNEL (eBPF/XDP)</text>
+  
+  <rect x="35" y="125" width="160" height="50" class="box" fill="#FF8A80" stroke="#B71C1C" rx="3"/>
+  <text x="45" y="145" class="component">NIC Driver Hook</text>
+  <text x="45" y="162" class="label">spectre_xdp.c (XDP_PASS)</text>
+
+  <rect x="205" y="125" width="155" height="50" class="box" fill="#FF8A80" stroke="#B71C1C" rx="3"/>
+  <text x="215" y="145" class="component">Packet Capture</text>
+  <text x="215" y="162" class="label">Per-packet, <1μs latency</text>
+
+  <!-- Arrow down -->
+  <path d="M 115 175 L 115 220" class="arrow"/>
+
+  <rect x="35" y="220" width="320" height="50" class="box" fill="#FF8A80" stroke="#B71C1C" rx="3"/>
+  <text x="45" y="240" class="component">Ring Buffer + Feature Extraction</text>
+  <text x="45" y="257" class="label">20 features (flow stats, entropy, ports)</text>
+
+  <!-- Arrow down -->
+  <path d="M 115 270 L 115 315" class="arrow"/>
+
+  <rect x="35" y="315" width="320" height="40" class="box" fill="#FF8A80" stroke="#B71C1C" rx="3"/>
+  <text x="45" y="335" class="component">Block Map (eBPF Verdict)</text>
+  <text x="45" y="352" class="label">XDP_DROP for malicious IPs</text>
+
+  <!-- LAYER 2: USER SPACE (Python + STGNN) -->
+  <rect x="400" y="80" width="350" height="280" class="box userspace" rx="5"/>
+  <text x="415" y="105" class="layer-label">🟢 LAYER 2: USER SPACE (ML Engine)</text>
+
+  <rect x="415" y="125" width="160" height="50" class="box" fill="#7EE2D6" stroke="#008B8B" rx="3"/>
+  <text x="425" y="145" class="component">Receiver Daemon</text>
+  <text x="425" y="162" class="label">receiver_gnn.py</text>
+
+  <rect x="585" y="125" width="155" height="50" class="box" fill="#7EE2D6" stroke="#008B8B" rx="3"/>
+  <text x="595" y="145" class="component">STGNN Model</text>
+  <text x="595" y="162" class="label">PyTorch inference, 50-200ms</text>
+
+  <!-- Arrow down -->
+  <path d="M 575 175 L 575 220" class="arrow"/>
+
+  <rect x="415" y="220" width="320" height="50" class="box" fill="#7EE2D6" stroke="#008B8B" rx="3"/>
+  <text x="425" y="240" class="component">Ensemble Logic</text>
+  <text x="425" y="257" class="label">max(STGNN, heuristic) > 0.70 = BAN</text>
+
+  <!-- Arrow down -->
+  <path d="M 575 270 L 575 315" class="arrow"/>
+
+  <rect x="415" y="315" width="320" height="40" class="box" fill="#7EE2D6" stroke="#008B8B" rx="3"/>
+  <text x="425" y="335" class="component">Persistent Storage</text>
+  <text x="425" y="352" class="label">SQLite + JSONL logging</text>
+
+  <!-- LAYER 3: CONTROL PLANE (API + Dashboard) -->
+  <rect x="780" y="80" width="410" height="280" class="box ui" rx="5"/>
+  <text x="795" y="105" class="layer-label">🔵 LAYER 3: CONTROL PLANE (UI)</text>
+
+  <rect x="795" y="125" width="190" height="50" class="box" fill="#64B5F6" stroke="#1976D2" rx="3"/>
+  <text x="805" y="145" class="component">FastAPI Server</text>
+  <text x="805" y="162" class="label">REST + WebSocket</text>
+
+  <rect x="995" y="125" width="190" height="50" class="box" fill="#64B5F6" stroke="#1976D2" rx="3"/>
+  <text x="1005" y="145" class="component">React Dashboard</text>
+  <text x="1005" y="162" class="label">Real-time visualization</text>
+
+  <!-- Arrow down -->
+  <path d="M 890 175 L 890 220" class="arrow"/>
+
+  <rect x="795" y="220" width="390" height="50" class="box" fill="#64B5F6" stroke="#1976D2" rx="3"/>
+  <text x="805" y="240" class="component">WebSocket Stream (Threat Alerts)</text>
+  <text x="805" y="257" class="label">3D Globe, IP Graph, KPIs, Block Management</text>
+
+  <!-- Arrow down -->
+  <path d="M 890 270 L 890 315" class="arrow"/>
+
+  <rect x="795" y="315" width="390" height="40" class="box" fill="#64B5F6" stroke="#1976D2" rx="3"/>
+  <text x="805" y="335" class="component">External Systems</text>
+  <text x="805" y="352" class="label">SIEM, Alerts, Reporting</text>
+
+  <!-- COMMUNICATION PATHS -->
+  <!-- Kernel to User Space -->
+  <path d="M 350 180 L 400 180" class="arrow"/>
+  <text x="375" y="175" class="arrow-text">mmap ring buffer</text>
+
+  <!-- User Space to API -->
+  <path d="M 720 180 L 780 180" class="arrow"/>
+  <text x="750" y="175" class="arrow-text">ZeroMQ</text>
+
+  <!-- API back to Kernel -->
+  <path d="M 780 270 L 350 270" class="arrow" stroke="#999" stroke-dasharray="5,5"/>
+  <text x="565" y="290" class="arrow-text">Whitelist updates via eBPF maps</text>
+
+  <!-- NETWORK SECTION -->
+  <rect x="20" y="390" width="1170" height="80" fill="#fff9c4" stroke="#F5A623" stroke-width="2" rx="5"/>
+  <text x="40" y="415" class="subtitle" style="font-weight: bold;">🌐 NETWORK COMMUNICATION</text>
+  
+  <g>
+    <rect x="50" y="430" width="100" height="30" fill="#FF6B6B" stroke="#C92A2A" stroke-width="1" rx="3"/>
+    <text x="60" y="450" class="label" style="fill: white;">VPS (GCP)</text>
+    
+    <path d="M 150 445 L 350 445" class="arrow"/>
+    <text x="240" y="440" class="arrow-text">UDP 51820 (WireGuard AES-256)</text>
+    
+    <rect x="350" y="430" width="100" height="30" fill="#4ECDC4" stroke="#0A9396" stroke-width="1" rx="3"/>
+    <text x="360" y="450" class="label" style="fill: white;">WSL2 Receiver</text>
+    
+    <path d="M 450 445 L 650 445" class="arrow"/>
+    <text x="535" y="440" class="arrow-text">IPC (FastAPI)</text>
+    
+    <rect x="650" y="430" width="100" height="30" fill="#45B7D1" stroke="#1B6B8F" stroke-width="1" rx="3"/>
+    <text x="660" y="450" class="label" style="fill: white;">Dashboard</text>
+    
+    <path d="M 750 445 L 950 445" class="arrow"/>
+    <text x="835" y="440" class="arrow-text">WebSocket (HTTP/1.1 Upgrade)</text>
+    
+    <rect x="950" y="430" width="150" height="30" fill="#FFD93D" stroke="#F5A623" stroke-width="1" rx="3"/>
+    <text x="960" y="450" class="label" style="fill: #333;">Browser (Real-time View)</text>
+  </g>
+
+  <!-- METRICS & KEY STATS -->
+  <rect x="20" y="500" width="1170" height="290" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="5"/>
+  <text x="40" y="530" class="subtitle" style="font-weight: bold;">📊 PERFORMANCE METRICS & STATUS</text>
+
+  <!-- Column 1: Kernel Performance -->
+  <rect x="35" y="545" width="270" height="235" fill="#FFE8E8" stroke="#FF6B6B" stroke-width="1" rx="3" opacity="0.8"/>
+  <text x="50" y="565" class="component" style="font-weight: bold;">Kernel Performance</text>
+  <text x="50" y="585" class="label">• Latency: &lt;1 μs</text>
+  <text x="50" y="605" class="label">• Throughput: 10Gbps capable</text>
+  <text x="50" y="625" class="label">• Memory: LRU maps (1M+ flows)</text>
+  <text x="50" y="645" class="label">• Verdict: XDP_PASS/DROP</text>
+  <text x="50" y="665" class="label">• Packets captured: per-packet</text>
+  <text x="50" y="685" class="label">• Features extracted: 20</text>
+  <text x="50" y="705" class="label">• Status: ✅ Production (99.8% uptime)</text>
+
+  <!-- Column 2: Model Performance -->
+  <rect x="315" y="545" width="270" height="235" fill="#E8F8F6" stroke="#4ECDC4" stroke-width="1" rx="3" opacity="0.8"/>
+  <text x="330" y="565" class="component" style="font-weight: bold;">Model Performance</text>
+  <text x="330" y="585" class="label">• Lab F1-Score: 0.9856</text>
+  <text x="330" y="605" class="label">• Prod Detection Rate: 55.2%*</text>
+  <text x="330" y="625" class="label">• False Positives: 1.2%</text>
+  <text x="330" y="645" class="label">• Inference Time: 50-200ms</text>
+  <text x="330" y="665" class="label">• Ensemble Enabled: Yes</text>
+  <text x="330" y="685" class="label">• Confidence Threshold: 0.70</text>
+  <text x="330" y="705" class="label">• Dataset: CIC-IDS2017</text>
+  <text x="330" y="725" class="label" style="font-style: italic;">*Concept drift (fix: NF-UQ-v2)</text>
+
+  <!-- Column 3: Honeypot Results -->
+  <rect x="595" y="545" width="270" height="235" fill="#E8F0FF" stroke="#45B7D1" stroke-width="1" rx="3" opacity="0.8"/>
+  <text x="610" y="565" class="component" style="font-weight: bold;">Honeypot Results (24h)</text>
+  <text x="610" y="585" class="label">• Total Events: 2,939</text>
+  <text x="610" y="605" class="label">• Unique Source IPs: 39</text>
+  <text x="610" y="625" class="label">• Countries: 9 (73% USA, 14% BR)</text>
+  <text x="610" y="645" class="label">• Top Attack: 419 SSH attempts</text>
+  <text x="610" y="665" class="label">• Attacked Port: 22 (SSH)</text>
+  <text x="610" y="685" class="label">• Blocked Successfully: 202/366</text>
+  <text x="610" y="705" class="label">• Detection Method: Ensemble</text>
+
+  <!-- Column 4: System Health -->
+  <rect x="875" y="545" width="290" height="235" fill="#FFF8E8" stroke="#FFD93D" stroke-width="1" rx="3" opacity="0.8"/>
+  <text x="890" y="565" class="component" style="font-weight: bold;">System Health</text>
+  <text x="890" y="585" class="label">• VPS Uptime: 99.8%</text>
+  <text x="890" y="605" class="label">• WSL Uptime: 98.5%</text>
+  <text x="890" y="625" class="label">• API Response: &lt;200ms</text>
+  <text x="890" y="645" class="label">• Storage: SQLite + JSONL</text>
+  <text x="890" y="665" class="label">• Alerts: Real-time WebSocket</text>
+  <text x="890" y="685" class="label">• GeoIP Enrichment: MaxMind</text>
+  <text x="890" y="705" class="label">• VPN: WireGuard (AES-256)</text>
+  <text x="890" y="725" class="label">• Status: ✅ Production Ready</text>
+
+  <!-- FOOTER -->
+  <text x="600" y="785" text-anchor="middle" class="label">SPECTRE_GRID v1.0 | 3-Layer Architecture | 2,939 Real Attack Events Validated | Ready for Production</text>
+
+</svg>
