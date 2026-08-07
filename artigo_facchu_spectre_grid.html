@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SPECTRE_GRID: Um Sistema de Detecção e Prevenção de Intrusão Híbrido Baseado em eBPF/XDP e Redes Neurais em Grafo Espaço-Temporais (STGNN)</title>
+    <title>PROJETO DE PESQUISA: DESENVOLVER UMA FERRAMENTA IDS BASEADA EM DEEP LEARNING</title>
     <!-- MathJax CDN para renderização matemática correta -->
     <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
@@ -196,7 +196,7 @@
         </div>
 
         <div class="capa-titulo">
-            SPECTRE_GRID: UM SISTEMA DE DETECÇÃO E PREVENÇÃO DE INTRUSÃO HÍBRIDO BASEADO EM eBPF/XDP E REDES NEURAIS EM GRAFO ESPAÇO-TEMPORAIS (STGNN)
+            PROJETO DE PESQUISA: DESENVOLVER UMA FERRAMENTA IDS BASEADA EM DEEP LEARNING.
         </div>
 
         <div class="capa-footer">
@@ -217,7 +217,7 @@
         </div>
 
         <div class="capa-titulo">
-            SPECTRE_GRID: UM SISTEMA DE DETECÇÃO E PREVENÇÃO DE INTRUSÃO HÍBRIDO BASEADO EM eBPF/XDP E REDES NEURAIS EM GRAFO ESPAÇO-TEMPORAIS (STGNN)
+            PROJETO DE PESQUISA: DESENVOLVER UMA FERRAMENTA IDS BASEADA EM DEEP LEARNING.
         </div>
 
         <div class="rosto-bloco">
@@ -239,9 +239,9 @@
     <div class="resumo-box">
         <div class="resumo-titulo">RESUMO</div>
         <p style="text-indent: 0;">
-            O crescimento exponencial do tráfego em redes de computadores corporativas exige soluções de cibersegurança capazes de aliar mitigação em tempo real com baixa latência e alta precisão analítica. Os Sistemas de Detecção e Prevenção de Intrusão (IDS/IPS) convencionais enfrentam gargalos severos de overhead na pilha de rede do sistema operacional e limitação na identificação de padrões relacionais complexos, como varreduras de portas e movimentação lateral de ameaças. Este trabalho apresenta o <b>SPECTRE_GRID</b>, uma arquitetura híbrida de IDS/IPS desenvolvida no âmbito do Projeto de Pesquisa PVE2957-2025 do IFC Campus Brusque. A solução combina filtragem nativa no Kernel Linux via eBPF/XDP com uma Rede Neural em Grafo Espaço-Temporal (STGNN) composta por CNN-1D, LSTM e GATConv. Avaliada experimentalmente na proporção metodológica oficial de 80% para treinamento/validação e 20% para teste independente, a arquitetura alcançou F1-Score empírico de 0,7500 (75,00%), Precisão de 66,67%, Revocação de 85,71% e latência de inferência preditiva de 1,82 ms por lote relacional.
+            O crescimento exponencial do tráfego de dados em redes corporativas exige soluções de cibersegurança capazes de aliar mitigação em tempo real de baixa latência e alta capacidade de generalização na identificação de anomalias. Os Sistemas de Detecção e Prevenção de Intrusão (IDS/IPS) convencionais enfrentam gargalos severos de overhead na pilha de rede do sistema operacional e limitação na identificação de padrões relacionais complexos, como varreduras de portas e movimentação lateral de ameaças. Este trabalho apresenta o SPECTRE_GRID: UM SISTEMA DE DETECÇÃO E PREVENÇÃO DE INTRUSÃO HÍBRIDO BASEADO EM eBPF/XDP E REDES NEURAIS EM GRAFO ESPAÇO-TEMPORAIS (STGNN). Uma arquitetura híbrida de IDS/IPS desenvolvida no âmbito do Projeto de Pesquisa PVE2957-2025 ("IDS Deep Learning") do Instituto Federal Catarinense – Campus Brusque. A solução proposta opera em duas camadas integradas: um Data Plane nativo no Kernel Linux utilizando eBPF/XDP (eXpress Data Path) para descarte imediato de pacotes maliciosos via instrução XDP_DROP na camada de enlace/driver, e um Control Plane alimentado por um motor preditivo neural espaço-temporal (STGNN). A arquitetura neural combina Convoluções 1D (CNN-1D) para extração de padrões temporais sobre os atributos mais correlacionados (selecionados via método de Pearson), redes de memória de longo e curto prazo (LSTM) e camadas de Atenção em Grafo (GATConv) para modelar as dependências topológicas da rede de computadores, onde os nós representam endereços IP e as arestas correspondem aos fluxos de tráfego ativos. Avaliada experimentalmente na proporção de 80% para treinamento/validação e 20% para teste independente, a arquitetura alcançou F1-Score empírico de 0,7500 (75,00%), Precisão de 66,67%, Revocação de 85,71% e latência preditiva de 1,82 ms por lote relacional. Os resultados demonstram a viabilidade técnica do sistema para o monitoramento contínuo de redes sem causar degradação no desempenho do tráfego legítimo.
         </p>
-        <p style="text-indent: 0;"><b>Palavras-chave:</b> Segurança de Redes; eBPF/XDP; Redes Neurais em Grafo (GNN); Aprendizado Profundo; Detecção de Intrusão.</p>
+        <p style="text-indent: 0;"><b>Palavras-chave:</b> Segurança de Redes; eBPF/XDP; Redes Neurais em Grafo; Aprendizado Profundo; Detecção de Intrusão.</p>
     </div>
 
     <h1 class="secao">1. INTRODUÇÃO</h1>
