@@ -28,10 +28,11 @@ struct FlowKey {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 struct FlowMetrics {
-    packets: u64,
     bytes: u64,
+    packets: u64,
     start_time_ns: u64,
     last_time_ns: u64,
+    last_export_ns: u64,
     syn_count: u32,
     ack_count: u32,
     fin_count: u32,
@@ -53,6 +54,7 @@ struct FlowContext {
     prev_packets: u64,
     has_update: bool,
     latest_metrics: FlowMetrics,
+    latest_key: FlowKey,
 }
 
 impl FlowContext {
@@ -64,7 +66,24 @@ impl FlowContext {
             prev_bytes: 0,
             prev_packets: 0,
             has_update: false,
-            latest_metrics: FlowMetrics { packets: 0, bytes: 0, start_time_ns: 0, last_time_ns: 0, syn_count: 0, ack_count: 0, fin_count: 0, rst_count: 0 },
+            latest_metrics: FlowMetrics {
+                bytes: 0,
+                packets: 0,
+                start_time_ns: 0,
+                last_time_ns: 0,
+                last_export_ns: 0,
+                syn_count: 0,
+                ack_count: 0,
+                fin_count: 0,
+                rst_count: 0,
+            },
+            latest_key: FlowKey {
+                src_ip: 0,
+                dst_ip: 0,
+                src_port: 0,
+                dst_port: 0,
+                protocol: 0,
+            },
         }
     }
 }
@@ -110,6 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let src_ip = event.key.src_ip;
                 let ctx = flow_tracker.entry(src_ip).or_insert(FlowContext::new());
                 ctx.latest_metrics = event.metrics;
+                ctx.latest_key = event.key;
                 ctx.has_update = true;
             }
 
@@ -154,7 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
 
                     // Gravar no socket assincronamente
-                    send_to_ipc_socket(*src_ip, prob, ctx.latest_metrics.bytes, ctx.latest_metrics.packets).await;
+                    send_to_ipc_socket(&ctx.latest_key, prob, ctx.latest_metrics.bytes, ctx.latest_metrics.packets).await;
                 }
             }
 
@@ -180,16 +200,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-async fn send_to_ipc_socket(src_ip: u32, prob: f32, bytes: u64, packets: u64) {
+async fn send_to_ipc_socket(key: &FlowKey, prob: f32, bytes: u64, packets: u64) {
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     
     let is_threat = prob > DROP_THRESH;
+    let src_ip_str = std::net::Ipv4Addr::from(key.src_ip.to_ne_bytes()).to_string();
+    let dst_ip_str = std::net::Ipv4Addr::from(key.dst_ip.to_ne_bytes()).to_string();
+    let proto_str = match key.protocol {
+        6 => "TCP",
+        17 => "UDP",
+        _ => "OTHER",
+    };
+    let flow_id = ((now ^ (key.src_ip as u64)) % 10000) as u32;
+
     let payload = json!({
-        "flow_id": 1234,
-        "src_ip": format!("192.168.1.{}", src_ip % 255), // mock
-        "dst_ip": "127.0.0.1",
-        "port": 80,
-        "protocol": "TCP",
+        "flow_id": flow_id,
+        "src_ip": src_ip_str,
+        "dst_ip": dst_ip_str,
+        "port": key.dst_port,
+        "protocol": proto_str,
         "probability": prob * 100.0,
         "is_threat": is_threat,
         "bytes": bytes,

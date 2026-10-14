@@ -194,7 +194,7 @@ static uint64_t clock_ns() {
 static std::string g_local_ip = "127.0.0.1";
 static int g_ipc_fd = -1;
 
-static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, uint64_t packets) {
+static void write_cpp_alert_to_log(const flow_key_t& key, float prob, uint64_t bytes, uint64_t packets) {
     if (g_ipc_fd < 0) {
         g_ipc_fd = socket(AF_UNIX, SOCK_STREAM, 0);
         if (g_ipc_fd >= 0) {
@@ -213,15 +213,19 @@ static void write_cpp_alert_to_log(uint32_t src_ip, float prob, uint64_t bytes, 
     std::tm tm = *std::localtime(&t);
     std::ostringstream ts; ts << std::put_time(&tm, "%H:%M:%S");
 
-    struct in_addr src_addr; src_addr.s_addr = src_ip;
+    struct in_addr src_addr; src_addr.s_addr = key.src_ip;
+    struct in_addr dst_addr; dst_addr.s_addr = key.dst_ip;
     std::string src_str = inet_ntoa(src_addr);
+    std::string dst_str = (key.dst_ip != 0) ? inet_ntoa(dst_addr) : g_local_ip;
     bool is_threat = prob > DROP_THRESH;
+    std::string proto_str = (key.protocol == 6) ? "TCP" : (key.protocol == 17 ? "UDP" : "OTHER");
+    uint16_t port = (key.dst_port != 0) ? key.dst_port : 80;
 
     std::ostringstream ss;
     ss << "{\"flow_id\": " << (std::rand() % 10000)
        << ", \"src_ip\": \"" << src_str << (is_threat ? " (ALVO SUSPEITO)" : "") << "\""
-       << ", \"dst_ip\": \"" << g_local_ip << "\""
-       << ", \"port\": 80, \"protocol\": \"TCP\""
+       << ", \"dst_ip\": \"" << dst_str << "\""
+       << ", \"port\": " << port << ", \"protocol\": \"" << proto_str << "\""
        << ", \"probability\": " << std::fixed << std::setprecision(2) << (prob * 100.0f)
        << ", \"is_threat\": " << (is_threat ? "true" : "false")
        << ", \"bytes\": " << bytes << ", \"packets\": " << packets
@@ -306,7 +310,7 @@ void inference_worker(torch::jit::script::Module module, int block_map_fd) {
                 if (raw_pps > 100.0f && raw_syn_ratio > 0.8f) {
                     struct block_info_t binfo = {}; binfo.block_time_ns = now; binfo.blocked_packets = 0;
                     bpf_map_update_elem(block_map_fd, &src_ip, &binfo, BPF_ANY);
-                    write_cpp_alert_to_log(src_ip, 0.98f, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
+                    write_cpp_alert_to_log(ctx.latest_key, 0.98f, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
                     continue; // Pula GNN se a heurística já pegou
                 }
 
@@ -317,7 +321,7 @@ void inference_worker(torch::jit::script::Module module, int block_map_fd) {
                     active_ips.push_back(src_ip);
                     node_tensors.push_back(t);
                 } else {
-                    write_cpp_alert_to_log(src_ip, 0.0f, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
+                    write_cpp_alert_to_log(ctx.latest_key, 0.0f, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
                 }
             }
 
@@ -366,7 +370,7 @@ void inference_worker(torch::jit::script::Module module, int block_map_fd) {
                             bpf_map_update_elem(block_map_fd, &src_ip, &binfo, BPF_ANY);
                         }
                         FlowContext& ctx = flow_tracker[src_ip];
-                        write_cpp_alert_to_log(src_ip, prob, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
+                        write_cpp_alert_to_log(ctx.latest_key, prob, ctx.latest_metrics.bytes, ctx.latest_metrics.packets);
                     }
                 } catch (const c10::Error& e) {
                     std::cerr << "[ERRO] IA: " << e.what() << std::endl;

@@ -6,6 +6,11 @@
 #define MAX_TRACKED_FLOWS 100000
 #define MAX_BLOCKED_IPS 10000
 
+// Rate limiting & sampling parameters for ring buffer
+#define RINGBUF_THROTTLE_NS 500000ULL               // 500 us throttling per general flow
+#define RINGBUF_CRITICAL_FLAG_THROTTLE_NS 100000ULL // 100 us throttling for SYN/RST/FIN
+#define RINGBUF_PKT_SAMPLE_MASK 0x7F                // Sample every 128 packets (mask 127)
+
 // Flow key for tracking (5-tuple)
 struct flow_key_t {
     __u32 src_ip;
@@ -21,6 +26,7 @@ struct flow_metrics_t {
     __u64 packets;
     __u64 start_time_ns;
     __u64 last_time_ns;
+    __u64 last_export_ns;
     __u32 syn_count;
     __u32 ack_count;
     __u32 fin_count;
