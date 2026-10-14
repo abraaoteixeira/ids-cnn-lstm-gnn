@@ -77,25 +77,35 @@ graph TB
     VPS ---|"WireGuard AES-256\nUDP 51820 — keepalive 25s"| WSL
 ```
 
-**Fluxo:** Pacote TCP → XDP Hook (kernel) → sensor_ebpf.py → ZeroMQ → WireGuard → receiver_gnn.py → STGNN + Heurístico → FastAPI → React Dashboard
+**Fluxo Oficial v2.0:** Pacote de Rede → Hook XDP no Kernel (`spectre_xdp.c`) → Rate Limiting / Ring Buffer BPF → Motor de Fusão Multi-Threaded (`loader_fusion_v2.cpp` / `loader_fusion_rs`) → Normalização Z-Score Online (Welford) → Inferência STGNN + Ensemble Adaptativo (`spectre_model_scripted.pt`) → Inserção em `block_map` (Kernel) + Unix Socket (`/tmp/spectre.sock`) → FastAPI V2 (`dashboard_api_v2.py`) → SQLite (`spectre_history_v2.db`) → Dashboard React V2 (`dashboard_v2/`)
 
 ### 1. Data Plane (Kernel Space)
-*   **eBPF / XDP (`ebpf/spectre_xdp.c`):** Injeta um programa C compilado para bytecode diretamente no driver da placa de rede. Se o IP de origem estiver no mapa hash `block_map`, o pacote é descartado (`XDP_DROP`) com latência na casa dos nanossegundos, blindando o sistema operacional antes de subir para a pilha TCP/IP convencional.
-*   **LRU Maps (`flow_map`):** Consolida contadores estatísticos em tempo real (bytes, pacotes, flags SYN, ACK, FIN, RST) associados a uma chave identificadora única de fluxo (5-tuple).
+*   **eBPF / XDP (`ebpf/spectre_xdp.c`):** Injeta um programa C compilado para bytecode BPF diretamente no driver da placa de rede. Se o IP de origem estiver no mapa hash `block_map`, o pacote é descartado (`XDP_DROP`) com latência ultra-baixa (< 0.85 µs), blindando o sistema operacional antes de atingir a pilha TCP/IP do kernel.
+*   **Correção de Endianness e Métricas:** Conversão explícita de `iph->tot_len` e portas via `bpf_ntohs()` para contagem precisa de bytes/s e portas de origem/destino em arquiteturas x86_64.
+*   **Mecanismo Anti-Saturação de Ring Buffer:** Algoritmo adaptativo de throttling por fluxo:
+    - O 1º pacote de qualquer fluxo sempre é emitido imediatamente.
+    - Pacotes com flags críticas (SYN, RST, FIN) sofrem amostragem com janela mínima de 100 µs (`RINGBUF_CRITICAL_FLAG_THROTTLE_NS`).
+    - Tráfego regular volumétrico é emitido com janela mínima de 500 µs ou a cada 128 pacotes (bitwise mask `0x7F`), enquanto os contadores exatos continuam sendo atualizados atomicamente no mapa BPF `flow_map`.
+*   **LRU Maps (`flow_map`):** Consolida contadores estatísticos em tempo real (bytes, pacotes, flags SYN, ACK, FIN, RST) associados a uma chave de fluxo (5-tuple).
 
-### 2. User Space Daemon (Nativo C++ / Rust)
-*   **Motor de Fusão C++ (`ebpf/loader_fusion_v2.cpp`):** Escrito em C++17 com suporte multi-thread, lê do Ring Buffer e alimenta a inferência da LibTorch.
-*   **Alternativa em Rust (`loader_fusion_rs/src/main.rs`):** Implementação concorrente com Tokio e bindings `tch-rs` para LibTorch.
-*   **Normalização Online (Z-Score / Welford):** Utiliza o algoritmo de Welford para calcular médias e desvios padrão *dinamicamente* em tempo real (sem dados históricos prévios), estabilizando os tensores contra distribuições de tráfego variável.
-*   **Inference Engine (LibTorch) com Dynamic Graph Batching:** Carrega o modelo compilado em TorchScript (`spectre_model_scripted.pt`). A cada ciclo de 1 segundo, agrega todos os IPs ativos em um lote (`active_ips`), constrói a matriz bidirecional de arestas `[2, E]` a partir dos IPs de destino reais e executa a inferência relacional da STGNN com Message Passing topológico real.
+### 2. User Space Daemon & Camadas de Execução
+O ecossistema SPECTRE_GRID organiza suas camadas em três stacks complementares:
+1.  **Stack Oficial v2.0 (Nativo C++17 Multi-Threaded):**
+    - `ebpf/loader_fusion_v2.cpp`: Thread 1 (Produtora) drena o Ring Buffer e enfileira eventos em O(1); Thread 2 (Consumidora) calcula deltas, aplica Z-Score online (Welford), monta grafos dinâmicos por lote e executa o modelo LibTorch TorchScript (`spectre_model_scripted.pt`).
+    - Latência de inferência local: ~338 µs a 1.5 ms.
+2.  **Stack Rust Concorrente (`loader_fusion_rs/`):**
+    - Implementação moderna em Rust com Tokio, canais MPSC sem lock e bindings `tch-rs` para LibTorch, emitindo alertas estruturados com resolução direta de IPs e portas.
+3.  **Stack de Pesquisa & Honeypot Cloud (`sensor_ebpf.py` + `receiver_gnn.py`):**
+    - Pipeline distribuído utilizado na validação na GCP: sensor em Python/BCC coletando no kernel da VPS, transmitindo via ZeroMQ sobre túnel WireGuard cifrado para o WSL2 local, com ciclo fechado RPC Cloud-to-Edge (< 5 ms).
 
-### 3. Control Plane & UI (FastAPI / Go & React Dashboard)
-*   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco removendo arquivos de log intermediários. O Daemon transmite os JSONs diretamente para a memória RAM do backend FastAPI ([dashboard_api_v2.py](dashboard_api_v2.py)) ou do Go Server ([main.go](dashboard_go/main.go)).
-*   **Dashboard Web Enterprise (`dashboard_v2/`):** Interface profissional de monitoramento em tempo real inspirada nos painéis Cloudflare/Fortinet, desenvolvida com React 19, Vite e Recharts. Possui controle duplo de visualização no painel principal:
-    *   **Nível de Ameaça (GNN) & Auditoria XAI:** Gráfico de área que plota a probabilidade de intrusão e os pesos de atenção espaço-temporal em tempo real, acompanhado por um **Módulo de Auditoria de IA (XAI)** em split-screen. O HUD lateral exibe latência de inferência espaço-temporal dinâmica, classificação de criticidade (BAIXO, MÉDIO, ALTO, CRÍTICO), o IP de foco da atenção GNN e o pipeline neural interativo.
-    *   **Grafo de Nós:** Visualização topológica 2D interativa utilizando física (`react-force-graph-2d`). Os IPs dos pacotes são desenhados diretamente como nós identificados na tela (verde para seguros, vermelho vivo para suspeitos/bloqueados), otimizados contra vazamento de memória e sobrecarga do grafo (limite de 80 nós e 150 links ativos simultâneos).
-*   **Localização Completa (PT-BR) & Identidade IFC:** Dashboard totalmente em Português do Brasil com integração oficial da logomarca do Instituto Federal Catarinense (IFC) no cabeçalho do projeto.
-*   **SQLite Storage (`spectre_history_v2.db`):** Registra o histórico persistente das ameaças mitigadas usando gravação assíncrona por lotes (batch inserts).
+### 3. Control Plane, Persistência & UI
+*   **IPC via Unix Sockets (`/tmp/spectre.sock`):** Zera o I/O físico de disco na ingestão de telemetria crítica.
+*   **SQLite Storage (`spectre_history_v2.db`):** Registra o histórico persistente das ameaças mitigadas usando gravação assíncrona por lotes (batch queue no FastAPI para suportar picos de DDoS sem degradação).
+*   **Dashboard Web Enterprise (`dashboard_v2/`):** Interface profissional de monitoramento em tempo real inspirada nos painéis Cloudflare/Fortinet, desenvolvida com React 19, Vite e Recharts, com módulo de Auditoria de IA (XAI), Grafo de Nós (Topologia Relacional 2D) e Globo 3D de ataques.
+*   **Taxonomia de Latências do SPECTRE_GRID:**
+    - **Descarte no Kernel (`XDP_DROP`):** `< 0.85 µs` (mitigação em taxa de linha).
+    - **Inferência Local STGNN:** `~338 µs` a `1.5 ms` (processamento de lote espaço-temporal).
+    - **Ciclo Fechado RPC (Cloud-to-Edge via WireGuard):** `< 5 ms`.
 
 ---
 
@@ -157,7 +167,25 @@ Para garantir que o repositório seja **Plug-and-Play** em produção (VPS/Cloud
 
 ---
 
-## ⚡ Guia de Execução Rápida
+## ☁️ Ambiente em Nuvem: GitHub Codespaces (Linux + eBPF Ready)
+
+O repositório é configurado como **DevContainer** oficial (`.devcontainer/devcontainer.json`) para inicialização em 1 clique no **GitHub Codespaces**. O container provisiona automaticamente:
+- Toolchain de compilação do Kernel eBPF: `clang`, `llvm`, `libbpf-dev`, `linux-libc-dev`, `bpftool`.
+- Compilador e ecossistema Rust/Cargo (`loader_fusion_rs`).
+- Python 3.11 com `torch`, `torch_geometric`, `pandas`, `numpy`, `fastapi`, `uvicorn`, `aiosqlite`, `pytest`.
+
+### Executando Testes Automatizados no Codespaces / Linux
+```bash
+# Executa a suite completa de sanidade e benchmarks (eBPF + STGNN + Rust + SQLite)
+bash scripts/verify_codespace.sh
+
+# Ou rode diretamente via pytest
+python3 -m pytest tests/test_pipeline.py -v -s
+```
+
+---
+
+## ⚡ Guia de Execução Rápida (Local / WSL2)
 
 ### ⚠️ Regra de Ouro (WSL2 / Performance)
 > [!CAUTION]

@@ -16,7 +16,10 @@ echo -e "${CYAN}    🚀 INICIANDO ECOSSISTEMA SPECTRE_GRID V2.0${NC}"
 echo -e "${CYAN}======================================================${NC}"
 
 # 1. Ativar o Ambiente Virtual
-if [ -d ".venv_fast" ]; then
+if [ -d ".venv_wsl" ]; then
+    echo -e "[*] Ativando ambiente virtual Python (.venv_wsl)..."
+    source .venv_wsl/bin/activate
+elif [ -d ".venv_fast" ]; then
     echo -e "[*] Ativando ambiente virtual Python (.venv_fast)..."
     source .venv_fast/bin/activate
 elif [ -d ".venv" ]; then
@@ -62,7 +65,7 @@ echo -e "${CYAN}======================================================${NC}"
 
 echo -e "\n${YELLOW}💡 Para Alimentar o Dashboard com Fluxo de Dados:${NC}"
 echo -e " 1. ${GREEN}Simulação de Ataque (Stress Test):${NC}"
-echo -e "    python3 stress_test.py"
+echo -e "    python3 tools/stress_test.py"
 echo -e " 2. ${GREEN}Captura eBPF/XDP Real (Necessita Sudo/Root):${NC}"
 echo -e "    sudo ./build/spectre_fusion $ACTIVE_IFACE"
 echo -e " 3. ${GREEN}Parar o Servidor API V2:${NC}"

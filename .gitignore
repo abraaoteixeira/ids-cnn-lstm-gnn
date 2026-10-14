@@ -11,8 +11,10 @@ __pycache__/
 dist/
 *.egg
 
-# === Build / Compilação C++ ===
+# === Build / Compilação C++ & Rust ===
 build/
+target/
+loader_fusion_rs/target/
 *.o
 *.so
 *.a
@@ -43,5 +45,21 @@ Thumbs.db
 
 # === Logs & Outputs ===
 *.log
+data/logs/*.log
 data/processed/confusion_matrix.png
 .aider*
+
+# === Segurança, Credenciais e Propriedade Intelectual (NIT/INPI) ===
+*.pem
+*.key
+*.priv
+*.id_rsa
+*.id_ed25519
+*.wireguard
+wg*.conf
+gcp_credentials*.json
+*secret*
+*token*
+*nit*draft*
+*patente*
+*formulario_nit*
