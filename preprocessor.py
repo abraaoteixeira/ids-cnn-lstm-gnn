@@ -682,6 +682,12 @@ def build_inductive_splits(
         test_snapshots = [test_graph]
         protocol_name = "inductive_temporal_60_20_20"
 
+    snap_summary = {
+        "train": summarize_snapshots(train_snapshots),
+        "val": summarize_snapshots(val_snapshots),
+        "test": summarize_snapshots(test_snapshots),
+    }
+
     return {
         "protocol": protocol_name,
         "feature_scope": feature_scope,
@@ -693,11 +699,8 @@ def build_inductive_splits(
         "train_snapshots": train_snapshots,
         "val_snapshots": val_snapshots,
         "test_snapshots": test_snapshots,
-        "snapshot_summary": {
-            "train": summarize_snapshots(train_snapshots),
-            "val": summarize_snapshots(val_snapshots),
-            "test": summarize_snapshots(test_snapshots),
-        },
+        "snapshot_summary": snap_summary,
+        "snapshot_stats": snap_summary,
         "top_features": top_features,
         "scaler_mean": scaler.mean_.tolist(),
         "scaler_scale": scaler.scale_.tolist(),

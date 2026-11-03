@@ -388,3 +388,37 @@ def test_checkpoint_periodic_save_and_resume():
         saved_state = torch.load(resume_file, map_location="cpu", weights_only=False)
         assert saved_state["epoch"] == 4
 
+
+def test_pure_cnn_lstm_variant_and_val_only_mode():
+    """
+    Verifica:
+      1. `model_variant='cnn_lstm_pure'` instancia `SPECTRE_GRID(use_gat=False)` sem camada GAT
+         (baseline temporal puro `CNN1D -> LSTM -> FC`).
+      2. `val_only=True` executa o treinamento e seleção na validação sem consultar o conjunto
+         de teste reservado (`test_held_out is None`).
+    """
+    df = pp.generate_test_sample(n=120, seed=55)
+    bundle = pp.build_inductive_splits(df, target_col="target", time_col="timestamp", k=8, seq_len=4, window_sec=60.0)
+    assert "snapshot_stats" in bundle and bundle["snapshot_stats"] == bundle["snapshot_summary"]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ckpt = str(Path(tmpdir) / "pure_cnn_lstm.pth")
+        res = tr.train_and_evaluate(
+            train_g=bundle["train_snapshots"],
+            val_g=bundle["val_snapshots"],
+            test_g=bundle["test_snapshots"],
+            epochs=2,
+            lr=0.002,
+            patience=3,
+            seed=42,
+            checkpoint_out=ckpt,
+            model_variant="cnn_lstm_pure",
+            val_only=True,
+        )
+        assert res["model_variant"] == "cnn_lstm_pure"
+        assert res["val_only"] is True
+        assert res["test_held_out"] is None, "Modo val_only=True não pode retornar métricas do teste reservado!"
+        state = torch.load(ckpt, map_location="cpu", weights_only=True)
+        assert all(not k.startswith("gat.") for k in state.keys()), "Modelo cnn_lstm_pure não deve conter parâmetros GATConv!"
+
+

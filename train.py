@@ -106,7 +106,18 @@ def parse_args():
     parser.add_argument(
         "--ablation_no_graph",
         action="store_true",
-        help="Substitui arestas entre hosts por apenas auto-loops (avalia CNN+LSTM sem contexto relacional)",
+        help="Substitui arestas entre hosts por apenas auto-loops (GAT com self-loops)",
+    )
+    parser.add_argument(
+        "--model_variant",
+        default="cnn_lstm_gat",
+        choices=["cnn_lstm_gat", "cnn_lstm_pure", "gat_self_loop"],
+        help="Variante arquitetural: 'cnn_lstm_gat' (completo), 'cnn_lstm_pure' (sem camada GAT) ou 'gat_self_loop'",
+    )
+    parser.add_argument(
+        "--val_only",
+        action="store_true",
+        help="Modo exploratório: treina e avalia APENAS na validação, sem consultar o conjunto de teste reservado",
     )
     return parser.parse_args()
 
@@ -331,6 +342,8 @@ def train_and_evaluate(
     device: Optional[torch.device] = None,
     checkpoint_out: str = "data/processed/best_model_clean.pth",
     ablation_no_graph: bool = False,
+    model_variant: str = "cnn_lstm_gat",
+    val_only: bool = False,
     batch_size: int = 8,
     resume: bool = False,
     resume_state_out: Optional[str] = None,
@@ -339,7 +352,7 @@ def train_and_evaluate(
     """
     Executa o ciclo completo de treinamento com `torch_geometric.loader.DataLoader` sobre snapshots
     temporais, guiado exclusivamente pela validação, com salvamento periódico/retomada de estado e
-    avaliação única no conjunto de teste reservado.
+    avaliação única no conjunto de teste reservado (exceto se `val_only=True`).
     """
     set_deterministic_seed(seed)
 
@@ -351,10 +364,13 @@ def train_and_evaluate(
     val_list = _normalize_to_graph_list(val_g, device)
     test_list = _normalize_to_graph_list(test_g, device)
 
-    if ablation_no_graph:
+    effective_variant = "gat_self_loop" if (ablation_no_graph and model_variant == "cnn_lstm_gat") else model_variant
+    if effective_variant in ("gat_self_loop", "cnn_lstm_pure") or ablation_no_graph:
         train_list = [apply_self_loop_only(g) for g in train_list]
         val_list = [apply_self_loop_only(g) for g in val_list]
         test_list = [apply_self_loop_only(g) for g in test_list]
+
+    use_gat = effective_variant != "cnn_lstm_pure"
 
     train_loader = DataLoader(train_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
     val_loader = DataLoader(val_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
@@ -368,6 +384,7 @@ def train_and_evaluate(
         lstm_hidden_size=64,
         gnn_hidden_size=64,
         gat_heads=4,
+        use_gat=use_gat,
     ).to(device)
 
     # Calcula pos_weight apenas nos snapshots de treino para lidar com desbalanceamento
@@ -481,28 +498,38 @@ def train_and_evaluate(
             )
             break
 
-    # 3. Recarregar o melhor checkpoint escolhido na Validação e avaliar o Teste Reservado UMA ÚNICA VEZ
+    # 3. Recarregar o melhor checkpoint escolhido na Validação
     state_dict = torch.load(checkpoint_out, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)
-    test_loss, test_metrics, y_test_true, y_test_pred, test_latency = evaluate_snapshots(
-        model, test_loader, criterion, device, num_snapshots=len(test_list)
-    )
 
-    logging.info(
-        f"[TESTE RESERVADO / HELD-OUT] Acc: {test_metrics['accuracy']:.4f} | "
-        f"Prec: {test_metrics['precision']:.4f} | Rec: {test_metrics['recall']:.4f} | "
-        f"F1: {test_metrics['f1_score']:.4f} | FPR: {test_metrics['fpr']:.4f} | "
-        f"Latência: {test_latency['ms_per_snapshot']:.3f} ms/snapshot ({test_latency['us_per_node']:.2f} us/nó) | "
-        f"CM: {test_metrics['confusion_matrix']}"
-    )
+    if val_only:
+        logging.info("[VAL-ONLY MODE] Avaliação do conjunto de teste reservado ignorada para preservar isolamento experimental.")
+        test_loss = None
+        test_metrics = None
+        y_test_true = np.zeros((0,), dtype=np.int64)
+        y_test_pred = np.zeros((0,), dtype=np.int64)
+        test_latency = None
+    else:
+        test_loss, test_metrics, y_test_true, y_test_pred, test_latency = evaluate_snapshots(
+            model, test_loader, criterion, device, num_snapshots=len(test_list)
+        )
+        logging.info(
+            f"[TESTE RESERVADO / HELD-OUT] Acc: {test_metrics['accuracy']:.4f} | "
+            f"Prec: {test_metrics['precision']:.4f} | Rec: {test_metrics['recall']:.4f} | "
+            f"F1: {test_metrics['f1_score']:.4f} | FPR: {test_metrics['fpr']:.4f} | "
+            f"Latência: {test_latency['ms_per_snapshot']:.3f} ms/snapshot ({test_latency['us_per_node']:.2f} us/nó) | "
+            f"CM: {test_metrics['confusion_matrix']}"
+        )
 
     return {
+        "model_variant": effective_variant,
+        "val_only": bool(val_only),
         "best_epoch": best_epoch,
         "resumed_from_epoch": resumed_from_epoch,
         "validation_best": best_val_metrics,
         "test_held_out": test_metrics,
         "test_latency": test_latency,
-        "test_loss": round(test_loss, 6),
+        "test_loss": round(test_loss, 6) if test_loss is not None else None,
         "y_test_true": y_test_true,
         "y_test_pred": y_test_pred,
         "graph_stats": {
@@ -546,13 +573,16 @@ def main():
         device=device,
         checkpoint_out=args.checkpoint_out,
         ablation_no_graph=args.ablation_no_graph,
+        model_variant=args.model_variant,
+        val_only=args.val_only,
         batch_size=args.batch_size,
         resume=args.resume,
         resume_state_out=args.resume_state_out,
         save_every=args.save_every,
     )
 
-    save_confusion_matrix(result["y_test_true"], result["y_test_pred"], save_path=args.cm_out)
+    if not args.val_only and len(result["y_test_true"]) > 0:
+        save_confusion_matrix(result["y_test_true"], result["y_test_pred"], save_path=args.cm_out)
 
     report = {
         "git_commit": get_git_commit(),
@@ -562,7 +592,9 @@ def main():
         "protocol": meta.get("protocol"),
         "feature_scope": meta.get("feature_scope"),
         "window_sec": meta.get("window_sec"),
+        "model_variant": result["model_variant"],
         "ablation_no_graph": bool(args.ablation_no_graph),
+        "val_only": bool(args.val_only),
         "top_features": meta.get("top_features", []),
         "split_rows": meta.get("split_rows", {}),
         "graph_stats": result["graph_stats"],
