@@ -428,6 +428,8 @@ def train_and_evaluate(
             f"(última concluída: {resumed_from_epoch}, melhor Val F1={best_val_f1:.4f} na época {best_epoch})."
         )
 
+    train_wall_t0 = time.perf_counter()
+
     for epoch in range(start_epoch, epochs + 1):
         # 1. Passo de Treinamento (exclusivamente nos snapshots de treino)
         model.train()
@@ -498,11 +500,26 @@ def train_and_evaluate(
             )
             break
 
+    training_wall_time_sec = round(max(0.0, time.perf_counter() - train_wall_t0), 4)
+
     # 3. Recarregar o melhor checkpoint escolhido na Validação
     state_dict = torch.load(checkpoint_out, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)
 
+    _, best_val_eval_metrics, y_val_true, y_val_pred, val_latency = evaluate_snapshots(
+        model, val_loader, criterion, device, num_snapshots=len(val_list)
+    )
+    if not best_val_metrics:
+        best_val_metrics = best_val_eval_metrics
+
     if val_only:
+        logging.info(
+            f"[VAL-ONLY MODE] Melhor Época: {best_epoch} | Val Acc: {best_val_metrics['accuracy']:.4f} | "
+            f"Val Prec: {best_val_metrics['precision']:.4f} | Val Rec: {best_val_metrics['recall']:.4f} | "
+            f"Val F1: {best_val_metrics['f1_score']:.4f} | Val FPR: {best_val_metrics['fpr']:.4f} | "
+            f"Val Latência: {val_latency['ms_per_snapshot']:.3f} ms/snapshot ({val_latency['us_per_node']:.2f} us/nó) | "
+            f"Tempo Treino: {training_wall_time_sec:.2f}s | Val CM: {best_val_metrics['confusion_matrix']}"
+        )
         logging.info("[VAL-ONLY MODE] Avaliação do conjunto de teste reservado ignorada para preservar isolamento experimental.")
         test_loss = None
         test_metrics = None
@@ -526,7 +543,11 @@ def train_and_evaluate(
         "val_only": bool(val_only),
         "best_epoch": best_epoch,
         "resumed_from_epoch": resumed_from_epoch,
+        "training_wall_time_sec": training_wall_time_sec,
         "validation_best": best_val_metrics,
+        "validation_latency": val_latency,
+        "y_val_true": y_val_true,
+        "y_val_pred": y_val_pred,
         "test_held_out": test_metrics,
         "test_latency": test_latency,
         "test_loss": round(test_loss, 6) if test_loss is not None else None,
@@ -581,7 +602,9 @@ def main():
         save_every=args.save_every,
     )
 
-    if not args.val_only and len(result["y_test_true"]) > 0:
+    if args.val_only and len(result["y_val_true"]) > 0:
+        save_confusion_matrix(result["y_val_true"], result["y_val_pred"], save_path=args.cm_out)
+    elif not args.val_only and len(result["y_test_true"]) > 0:
         save_confusion_matrix(result["y_test_true"], result["y_test_pred"], save_path=args.cm_out)
 
     report = {
@@ -600,7 +623,9 @@ def main():
         "graph_stats": result["graph_stats"],
         "best_epoch_on_validation": result["best_epoch"],
         "resumed_from_epoch": result["resumed_from_epoch"],
+        "training_wall_time_sec": result["training_wall_time_sec"],
         "validation_metrics": result["validation_best"],
+        "validation_latency": result["validation_latency"],
         "held_out_test_metrics": result["test_held_out"],
         "inference_latency": result["test_latency"],
         "test_mask_used_in_scheduler_or_checkpoint": False,
