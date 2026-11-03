@@ -1,16 +1,17 @@
 """
 train.py
-Motor de treino STGNN livre de vazamento de dados (Leakage-Free) com suporte a
-Snapshots Temporais Discretos G_t = (V_t, E_t) via `torch_geometric.loader.DataLoader`:
+Motor de treino STGNN livre de vazamento de dados (Leakage-Free) com suporte a:
+ - Snapshots Temporais Discretos G_t = (V_t, E_t) via `torch_geometric.loader.DataLoader`.
  - Particionamento disjunto em 3 vias: Treino (60%), Validação (20%) e Teste Reservado (20%).
- - Rejeita por padrão grafos históricos únicos (pós-divisão), exigindo bundles pré-particionados livres de vazamento.
+ - Rejeição de grafos históricos individuais pré-processados globalmente.
+ - Salvamento periódico e retomada automática de estado (`--resume` / `--save_every`) para
+   tolerância a desconexões no Google Colab Pro (persistência em Google Drive) e no Dell G15.
  - Sementes aleatórias fixadas para reprodutibilidade científica.
- - Treinamento e avaliação sobre listas de snapshots G_t com `torch_geometric.loader.DataLoader`,
-   agregando as predições de todos os snapshots de validação/teste.
  - Novo forward pass em `model.eval()` APÓS `optimizer.step()` (nunca reutiliza logits pré-gradiente).
  - LR Scheduler e Early Stopping guiados EXCLUSIVAMENTE pelo F1 agregado do conjunto de Validação.
  - Conjunto de Teste avaliado uma única vez ao final, após recarregar o melhor checkpoint de validação.
- - Registro completo de Precision, Recall, F1-Score, False Positive Rate (FPR) e Matriz de Confusão.
+ - Registro completo de Precision, Recall, F1-Score, False Positive Rate (FPR), Matriz de Confusão e
+   Latência de Inferência (ms por snapshot e µs por nó).
 """
 
 import argparse
@@ -20,6 +21,7 @@ import os
 import random
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -76,9 +78,25 @@ def parse_args():
         help="Caminho para salvar o melhor checkpoint selecionado na validação",
     )
     parser.add_argument(
+        "--resume_state_out",
+        default=None,
+        help="Arquivo de estado completo para retomada após interrupção (default: <checkpoint_out>.resume.pt)",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Retoma automaticamente o treinamento a partir de --resume_state_out se existir",
+    )
+    parser.add_argument(
+        "--save_every",
+        type=int,
+        default=1,
+        help="Frequência (em épocas) para salvar o estado de retomada periódica",
+    )
+    parser.add_argument(
         "--report_out",
         default="data/processed/clean_evaluation_report.json",
-        help="Relatório JSON auditável com métricas de validação e teste reservado",
+        help="Relatório JSON auditável com métricas de validação, teste reservado e latência",
     )
     parser.add_argument(
         "--cm_out",
@@ -238,16 +256,21 @@ def evaluate_snapshots(
     loader: DataLoader,
     criterion: nn.Module,
     device: torch.device,
-) -> Tuple[float, Dict[str, object], np.ndarray, np.ndarray]:
+    num_snapshots: int = 1,
+) -> Tuple[float, Dict[str, object], np.ndarray, np.ndarray, Dict[str, float]]:
     """
     Executa um NOVO forward pass em modo `model.eval()` agregando predições de todos os snapshots
-    do `DataLoader` (validação ou teste). Nunca reutiliza logits pré-gradiente.
+    do `DataLoader` (validação ou teste) e medindo a latência de inferência.
     """
     model.eval()
     total_loss = 0.0
     total_nodes = 0
     all_true: List[np.ndarray] = []
     all_pred: List[np.ndarray] = []
+
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.synchronize(device)
+    t0 = time.perf_counter()
 
     for batch in loader:
         batch = batch.to(device)
@@ -264,11 +287,21 @@ def evaluate_snapshots(
         all_true.append(batch.y.detach().cpu().numpy())
         all_pred.append(preds.detach().cpu().numpy())
 
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.synchronize(device)
+    elapsed_sec = max(1e-9, time.perf_counter() - t0)
+
     y_true = np.concatenate(all_true, axis=0) if all_true else np.zeros((0,), dtype=np.int64)
     y_pred = np.concatenate(all_pred, axis=0) if all_pred else np.zeros((0,), dtype=np.int64)
     avg_loss = total_loss / max(1, total_nodes)
     metrics = compute_classification_metrics(y_true, y_pred)
-    return avg_loss, metrics, y_true, y_pred
+
+    latency = {
+        "total_eval_ms": round(elapsed_sec * 1e3, 4),
+        "ms_per_snapshot": round((elapsed_sec * 1e3) / max(1, num_snapshots), 4),
+        "us_per_node": round((elapsed_sec * 1e6) / max(1, total_nodes), 4),
+    }
+    return avg_loss, metrics, y_true, y_pred, latency
 
 
 def _forward_train_batch(model: nn.Module, batch: Data) -> torch.Tensor:
@@ -299,10 +332,14 @@ def train_and_evaluate(
     checkpoint_out: str = "data/processed/best_model_clean.pth",
     ablation_no_graph: bool = False,
     batch_size: int = 8,
+    resume: bool = False,
+    resume_state_out: Optional[str] = None,
+    save_every: int = 1,
 ) -> Dict[str, object]:
     """
     Executa o ciclo completo de treinamento com `torch_geometric.loader.DataLoader` sobre snapshots
-    temporais, guiado exclusivamente pela validação, e avalia o teste reservado uma única vez.
+    temporais, guiado exclusivamente pela validação, com salvamento periódico/retomada de estado e
+    avaliação única no conjunto de teste reservado.
     """
     set_deterministic_seed(seed)
 
@@ -349,10 +386,32 @@ def train_and_evaluate(
     best_val_metrics: Dict[str, object] = {}
     best_epoch = 0
     epochs_no_improve = 0
+    start_epoch = 1
+    resumed_from_epoch = 0
+
+    if resume_state_out is None:
+        resume_state_out = f"{checkpoint_out}.resume.pt"
 
     os.makedirs(os.path.dirname(checkpoint_out) or ".", exist_ok=True)
+    os.makedirs(os.path.dirname(resume_state_out) or ".", exist_ok=True)
 
-    for epoch in range(1, epochs + 1):
+    if resume and os.path.exists(resume_state_out):
+        state = torch.load(resume_state_out, map_location=device, weights_only=False)
+        model.load_state_dict(state["model_state_dict"])
+        optimizer.load_state_dict(state["optimizer_state_dict"])
+        scheduler.load_state_dict(state["scheduler_state_dict"])
+        best_val_f1 = float(state.get("best_val_f1", -1.0))
+        best_val_metrics = state.get("best_val_metrics", {})
+        best_epoch = int(state.get("best_epoch", 0))
+        epochs_no_improve = int(state.get("epochs_no_improve", 0))
+        resumed_from_epoch = int(state.get("epoch", 0))
+        start_epoch = resumed_from_epoch + 1
+        logging.info(
+            f"[RESUME] Retomando treinamento a partir da época {start_epoch} "
+            f"(última concluída: {resumed_from_epoch}, melhor Val F1={best_val_f1:.4f} na época {best_epoch})."
+        )
+
+    for epoch in range(start_epoch, epochs + 1):
         # 1. Passo de Treinamento (exclusivamente nos snapshots de treino)
         model.train()
         epoch_train_loss = 0.0
@@ -375,7 +434,9 @@ def train_and_evaluate(
         avg_train_loss = epoch_train_loss / max(1, epoch_train_nodes)
 
         # 2. Passo de Validação (NOVO forward pass agregando todos os snapshots de val; test NÃO é tocado)
-        val_loss, val_metrics, _, _ = evaluate_snapshots(model, val_loader, criterion, device)
+        val_loss, val_metrics, _, _, _ = evaluate_snapshots(
+            model, val_loader, criterion, device, num_snapshots=len(val_list)
+        )
         val_f1 = float(val_metrics["f1_score"])
 
         scheduler.step(val_f1)
@@ -395,29 +456,52 @@ def train_and_evaluate(
             torch.save(model.state_dict(), checkpoint_out)
         else:
             epochs_no_improve += 1
-            if epochs_no_improve >= patience:
-                logging.info(
-                    f"Early Stopping acionado na época {epoch} (baseado na Validação). "
-                    f"Melhor época: {best_epoch} (Val F1={best_val_f1:.4f})."
-                )
-                break
+
+        # Salvar estado periódico completo para retomada segura em caso de queda da sessão Colab/SSH
+        if save_every > 0 and (epoch % save_every == 0 or epoch == epochs):
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "scheduler_state_dict": scheduler.state_dict(),
+                    "best_val_f1": best_val_f1,
+                    "best_val_metrics": best_val_metrics,
+                    "best_epoch": best_epoch,
+                    "epochs_no_improve": epochs_no_improve,
+                    "seed": seed,
+                },
+                resume_state_out,
+            )
+
+        if epochs_no_improve >= patience:
+            logging.info(
+                f"Early Stopping acionado na época {epoch} (baseado na Validação). "
+                f"Melhor época: {best_epoch} (Val F1={best_val_f1:.4f})."
+            )
+            break
 
     # 3. Recarregar o melhor checkpoint escolhido na Validação e avaliar o Teste Reservado UMA ÚNICA VEZ
     state_dict = torch.load(checkpoint_out, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)
-    test_loss, test_metrics, y_test_true, y_test_pred = evaluate_snapshots(model, test_loader, criterion, device)
+    test_loss, test_metrics, y_test_true, y_test_pred, test_latency = evaluate_snapshots(
+        model, test_loader, criterion, device, num_snapshots=len(test_list)
+    )
 
     logging.info(
         f"[TESTE RESERVADO / HELD-OUT] Acc: {test_metrics['accuracy']:.4f} | "
         f"Prec: {test_metrics['precision']:.4f} | Rec: {test_metrics['recall']:.4f} | "
         f"F1: {test_metrics['f1_score']:.4f} | FPR: {test_metrics['fpr']:.4f} | "
+        f"Latência: {test_latency['ms_per_snapshot']:.3f} ms/snapshot ({test_latency['us_per_node']:.2f} us/nó) | "
         f"CM: {test_metrics['confusion_matrix']}"
     )
 
     return {
         "best_epoch": best_epoch,
+        "resumed_from_epoch": resumed_from_epoch,
         "validation_best": best_val_metrics,
         "test_held_out": test_metrics,
+        "test_latency": test_latency,
         "test_loss": round(test_loss, 6),
         "y_test_true": y_test_true,
         "y_test_pred": y_test_pred,
@@ -463,6 +547,9 @@ def main():
         checkpoint_out=args.checkpoint_out,
         ablation_no_graph=args.ablation_no_graph,
         batch_size=args.batch_size,
+        resume=args.resume,
+        resume_state_out=args.resume_state_out,
+        save_every=args.save_every,
     )
 
     save_confusion_matrix(result["y_test_true"], result["y_test_pred"], save_path=args.cm_out)
@@ -480,8 +567,10 @@ def main():
         "split_rows": meta.get("split_rows", {}),
         "graph_stats": result["graph_stats"],
         "best_epoch_on_validation": result["best_epoch"],
-        "validation_metrics": result["validation_metrics"] if "validation_metrics" in result else result["validation_best"],
+        "resumed_from_epoch": result["resumed_from_epoch"],
+        "validation_metrics": result["validation_best"],
         "held_out_test_metrics": result["test_held_out"],
+        "inference_latency": result["test_latency"],
         "test_mask_used_in_scheduler_or_checkpoint": False,
         "fresh_eval_forward_after_optimizer_step": True,
     }

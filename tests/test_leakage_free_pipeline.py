@@ -334,3 +334,57 @@ def test_dataloader_snapshot_aggregation_and_legacy_single_graph_rejection():
             f"mas retornou {len(res['y_test_true'])}."
         )
         assert res["graph_stats"]["test"]["num_snapshots"] == len(bundle["test_snapshots"])
+        assert "ms_per_snapshot" in res["test_latency"]
+        assert "us_per_node" in res["test_latency"]
+
+
+def test_checkpoint_periodic_save_and_resume():
+    """
+    Verifica que o salvamento periódico de estado (`resume_state_out`) permite interromper o
+    treinamento na época 2 e retomá-lo automaticamente até a época 4 (`resume=True`), restaurando
+    a época anterior (`resumed_from_epoch == 2`) para tolerância a quedas de sessão no Google Colab.
+    """
+    df = pp.generate_test_sample(n=120, seed=99)
+    bundle = pp.build_inductive_splits(df, target_col="target", time_col="timestamp", k=8, seq_len=4, window_sec=60.0)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ckpt = str(Path(tmpdir) / "model.pth")
+        resume_file = str(Path(tmpdir) / "model.pth.resume.pt")
+
+        # Fase 1: Treina até a época 2 e salva o estado periódico
+        res_part1 = tr.train_and_evaluate(
+            train_g=bundle["train_snapshots"],
+            val_g=bundle["val_snapshots"],
+            test_g=bundle["test_snapshots"],
+            epochs=2,
+            lr=0.002,
+            patience=5,
+            seed=42,
+            checkpoint_out=ckpt,
+            resume=False,
+            resume_state_out=resume_file,
+            save_every=1,
+        )
+        assert Path(resume_file).exists(), "O arquivo de estado de retomada não foi criado!"
+        assert res_part1["resumed_from_epoch"] == 0
+
+        # Fase 2: Simula reconexão do Colab/G15 retomando da época 2 até a época 4
+        res_part2 = tr.train_and_evaluate(
+            train_g=bundle["train_snapshots"],
+            val_g=bundle["val_snapshots"],
+            test_g=bundle["test_snapshots"],
+            epochs=4,
+            lr=0.002,
+            patience=5,
+            seed=42,
+            checkpoint_out=ckpt,
+            resume=True,
+            resume_state_out=resume_file,
+            save_every=1,
+        )
+        assert res_part2["resumed_from_epoch"] == 2, (
+            f"Deveria ter retomado da época 2, mas resumed_from_epoch={res_part2['resumed_from_epoch']}"
+        )
+        saved_state = torch.load(resume_file, map_location="cpu", weights_only=False)
+        assert saved_state["epoch"] == 4
+
