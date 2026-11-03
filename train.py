@@ -1,10 +1,14 @@
 """
 train.py
-Motor de treino STGNN livre de vazamento de dados (Leakage-Free):
+Motor de treino STGNN livre de vazamento de dados (Leakage-Free) com suporte a
+Snapshots Temporais Discretos G_t = (V_t, E_t) via `torch_geometric.loader.DataLoader`:
  - Particionamento disjunto em 3 vias: Treino (60%), Validação (20%) e Teste Reservado (20%).
+ - Rejeita por padrão grafos históricos únicos (pós-divisão), exigindo bundles pré-particionados livres de vazamento.
  - Sementes aleatórias fixadas para reprodutibilidade científica.
+ - Treinamento e avaliação sobre listas de snapshots G_t com `torch_geometric.loader.DataLoader`,
+   agregando as predições de todos os snapshots de validação/teste.
  - Novo forward pass em `model.eval()` APÓS `optimizer.step()` (nunca reutiliza logits pré-gradiente).
- - LR Scheduler e Early Stopping guiados EXCLUSIVAMENTE pelo F1 do conjunto de Validação.
+ - LR Scheduler e Early Stopping guiados EXCLUSIVAMENTE pelo F1 agregado do conjunto de Validação.
  - Conjunto de Teste avaliado uma única vez ao final, após recarregar o melhor checkpoint de validação.
  - Registro completo de Precision, Recall, F1-Score, False Positive Rate (FPR) e Matriz de Confusão.
 """
@@ -17,7 +21,7 @@ import random
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 import matplotlib
 matplotlib.use("Agg")
@@ -35,6 +39,7 @@ from sklearn.metrics import (
     recall_score,
 )
 from torch_geometric.data import Data
+from torch_geometric.loader import DataLoader
 
 from model import SPECTRE_GRID
 
@@ -43,6 +48,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
+
+LOADER_EXCLUDE_KEYS = ["ip2idx", "idx2ip", "scaler", "top_features", "topology_mode"]
 
 
 def set_deterministic_seed(seed: int = 42) -> None:
@@ -55,9 +62,10 @@ def set_deterministic_seed(seed: int = 42) -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Treino Reprodutível e Sem Vazamento do IDS STGNN")
-    parser.add_argument("--data_path", required=True, help="Caminho para o arquivo de grafos (.pt)")
+    parser = argparse.ArgumentParser(description="Treino Reprodutível e Sem Vazamento do IDS STGNN (Snapshots Temporais)")
+    parser.add_argument("--data_path", required=True, help="Caminho para o arquivo de partições/snapshots (.pt)")
     parser.add_argument("--epochs", type=int, default=30, help="Número de épocas")
+    parser.add_argument("--batch_size", type=int, default=8, help="Snapshots por mini-batch no DataLoader")
     parser.add_argument("--lr", type=float, default=0.001, help="Taxa de aprendizado")
     parser.add_argument("--patience", type=int, default=7, help="Paciência do Early Stopping (na validação)")
     parser.add_argument("--seed", type=int, default=42, help="Semente aleatória")
@@ -107,85 +115,93 @@ def save_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, save_path: str
     logging.info(f"Matriz de Confusão salva em: {save_path}")
 
 
-def extract_induced_subgraph(data: Data, node_indices: torch.Tensor) -> Data:
+def _normalize_to_graph_list(obj: Union[Data, List[Data]], device: torch.device) -> List[Data]:
+    """Normaliza um grafo único ou lista de snapshots para `List[Data]` no dispositivo alvo."""
+    if isinstance(obj, Data):
+        return [obj.to(device)]
+    if isinstance(obj, (list, tuple)):
+        out = [g.to(device) for g in obj if isinstance(g, Data) and g.x.shape[0] > 0]
+        if not out:
+            raise ValueError("A lista de snapshots fornecida está vazia (nenhum grafo com nós > 0).")
+        return out
+    raise TypeError(f"Esperado Data ou List[Data], recebido: {type(obj)}")
+
+
+def load_or_split_graphs(
+    raw_obj: object,
+    device: torch.device,
+    seed: int = 42,
+) -> Tuple[List[Data], List[Data], List[Data], Dict[str, object]]:
     """
-    Extrai um subgrafo induzido contendo apenas os nós selecionados e as arestas
-    cujos dois extremos pertencem a esse subconjunto (impede vazamento transdutivo).
+    Carrega exclusivamente bundles pré-particionados (train/val/test ou train_snapshots/val_snapshots/test_snapshots)
+    gerados pelo protocolo livre de vazamento (`preprocessor.py`).
+    Rejeita grafos históricos individuais (`isinstance(raw_obj, Data)`) pois dividir um grafo único após
+    seleção de features e normalização globais viola o isolamento metodológico.
     """
-    node_indices = node_indices.long()
-    num_total = data.x.shape[0]
-    mapping = torch.full((num_total,), -1, dtype=torch.long, device=data.x.device)
-    mapping[node_indices] = torch.arange(node_indices.numel(), dtype=torch.long, device=data.x.device)
-
-    x_sub = data.x[node_indices]
-    y_sub = data.y[node_indices]
-
-    if data.edge_index.numel() > 0:
-        src, dst = data.edge_index[0], data.edge_index[1]
-        valid_edges = (mapping[src] >= 0) & (mapping[dst] >= 0)
-        edge_index_sub = torch.stack([mapping[src[valid_edges]], mapping[dst[valid_edges]]], dim=0)
-    else:
-        edge_index_sub = torch.empty((2, 0), dtype=torch.long, device=data.x.device)
-
-    return Data(x=x_sub, edge_index=edge_index_sub, y=y_sub)
-
-
-def load_or_split_graphs(raw_obj: object, device: torch.device, seed: int) -> Tuple[Data, Data, Data, Dict[str, object]]:
-    """
-    Carrega as 3 partições indutivas (train/val/test) ou, caso receba um único grafo legado,
-    particiona os nós em 3 subgrafos induzidos disjuntos (60% / 20% / 20%).
-    """
-    meta: Dict[str, object] = {}
-    if isinstance(raw_obj, dict) and "train" in raw_obj and "val" in raw_obj and "test" in raw_obj:
-        train_g = raw_obj["train"].to(device)
-        val_g = raw_obj["val"].to(device)
-        test_g = raw_obj["test"].to(device)
-        meta["protocol"] = raw_obj.get("protocol", "inductive_bundle")
-        meta["top_features"] = raw_obj.get("top_features", [])
-        meta["split_rows"] = raw_obj.get("split_rows", {})
-        return train_g, val_g, test_g, meta
-
     if isinstance(raw_obj, Data):
-        data = raw_obj.to(device)
-        num_nodes = data.x.shape[0]
-        g = torch.Generator()
-        g.manual_seed(seed)
-        perm = torch.randperm(num_nodes, generator=g).to(device)
+        raise ValueError(
+            "Arquivo contém um único grafo histórico pré-processado globalmente. "
+            "Dividir um grafo após StandardScaler/Pearson globais não garante ausência de vazamento. "
+            "Gere as partições e snapshots temporais com `preprocessor.py` antes de treinar."
+        )
 
-        n_train = max(1, int(0.60 * num_nodes))
-        n_val = max(1, int(0.20 * num_nodes))
-        if n_train + n_val >= num_nodes:
-            n_train = max(1, num_nodes - 2)
-            n_val = 1
+    if not isinstance(raw_obj, dict):
+        raise TypeError(f"Formato de dados não suportado em --data_path: {type(raw_obj)}")
 
-        train_idx = perm[:n_train]
-        val_idx = perm[n_train : n_train + n_val]
-        test_idx = perm[n_train + n_val :]
+    meta: Dict[str, object] = {
+        "protocol": raw_obj.get("protocol", "inductive_bundle"),
+        "feature_scope": raw_obj.get("feature_scope", "unknown"),
+        "window_sec": raw_obj.get("window_sec", None),
+        "top_features": raw_obj.get("top_features", []),
+        "split_rows": raw_obj.get("split_rows", {}),
+    }
 
-        train_g = extract_induced_subgraph(data, train_idx)
-        val_g = extract_induced_subgraph(data, val_idx)
-        test_g = extract_induced_subgraph(data, test_idx)
-        meta["protocol"] = "induced_subgraph_60_20_20"
-        meta["top_features"] = getattr(data, "top_features", [])
-        return train_g, val_g, test_g, meta
+    if "train_snapshots" in raw_obj and "val_snapshots" in raw_obj and "test_snapshots" in raw_obj:
+        train_list = _normalize_to_graph_list(raw_obj["train_snapshots"], device)
+        val_list = _normalize_to_graph_list(raw_obj["val_snapshots"], device)
+        test_list = _normalize_to_graph_list(raw_obj["test_snapshots"], device)
+        return train_list, val_list, test_list, meta
 
-    raise TypeError(f"Formato de dados não suportado em --data_path: {type(raw_obj)}")
+    if "train" in raw_obj and "val" in raw_obj and "test" in raw_obj:
+        train_list = _normalize_to_graph_list(raw_obj["train"], device)
+        val_list = _normalize_to_graph_list(raw_obj["val"], device)
+        test_list = _normalize_to_graph_list(raw_obj["test"], device)
+        return train_list, val_list, test_list, meta
+
+    raise KeyError("O bundle em --data_path deve conter ('train_snapshots', 'val_snapshots', 'test_snapshots') ou ('train', 'val', 'test').")
 
 
-def edge_statistics(graph: Data) -> Dict[str, int]:
-    """Contabiliza total de nós, arestas totais, auto-loops e arestas reais entre hosts distintos."""
-    n_nodes = int(graph.x.shape[0])
-    if graph.edge_index.numel() == 0:
-        return {"nodes": n_nodes, "total_edges": 0, "self_loops": 0, "cross_host_edges": 0}
-    src, dst = graph.edge_index[0], graph.edge_index[1]
-    total = int(src.numel())
-    self_loops = int((src == dst).sum().item())
-    cross_host = int((src != dst).sum().item())
+def edge_statistics(graphs: Union[Data, List[Data]]) -> Dict[str, object]:
+    """
+    Contabiliza estatísticas estruturais de um grafo ou lista de snapshots temporais:
+    número de snapshots, total de nós, arestas totais, auto-loops, arestas reais entre hosts e balanço de classes.
+    """
+    g_list = [graphs] if isinstance(graphs, Data) else list(graphs)
+    total_nodes = 0
+    total_edges = 0
+    self_loops = 0
+    cross_host = 0
+    benign_0 = 0
+    attack_1 = 0
+
+    for g in g_list:
+        total_nodes += int(g.x.shape[0])
+        if g.edge_index.numel() > 0:
+            src, dst = g.edge_index[0], g.edge_index[1]
+            total_edges += int(src.numel())
+            self_loops += int((src == dst).sum().item())
+            cross_host += int((src != dst).sum().item())
+        benign_0 += int((g.y == 0).sum().item())
+        attack_1 += int((g.y == 1).sum().item())
+
     return {
-        "nodes": n_nodes,
-        "total_edges": total,
+        "num_snapshots": len(g_list),
+        "nodes": total_nodes,
+        "total_edges": total_edges,
         "self_loops": self_loops,
         "cross_host_edges": cross_host,
+        "benign_nodes_0": benign_0,
+        "attack_nodes_1": attack_1,
     }
 
 
@@ -217,27 +233,64 @@ def compute_classification_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Di
 
 
 @torch.no_grad()
-def evaluate_graph(model: nn.Module, graph: Data, criterion: nn.Module) -> Tuple[float, Dict[str, object], np.ndarray, np.ndarray]:
+def evaluate_snapshots(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+) -> Tuple[float, Dict[str, object], np.ndarray, np.ndarray]:
     """
-    Executa um NOVO forward pass em modo `model.eval()` sobre o grafo informado.
-    Nunca reutiliza logits calculados antes do `optimizer.step()`.
+    Executa um NOVO forward pass em modo `model.eval()` agregando predições de todos os snapshots
+    do `DataLoader` (validação ou teste). Nunca reutiliza logits pré-gradiente.
     """
     model.eval()
-    logits = model(graph.x, graph.edge_index)
-    loss = float(criterion(logits, graph.y.float()).item())
-    probs = torch.sigmoid(logits)
-    preds = (probs >= 0.5).long()
+    total_loss = 0.0
+    total_nodes = 0
+    all_true: List[np.ndarray] = []
+    all_pred: List[np.ndarray] = []
 
-    y_true = graph.y.detach().cpu().numpy()
-    y_pred = preds.detach().cpu().numpy()
+    for batch in loader:
+        batch = batch.to(device)
+        n_batch = int(batch.x.size(0))
+        if n_batch == 0:
+            continue
+        logits = model(batch.x, batch.edge_index)
+        loss = float(criterion(logits, batch.y.float()).item())
+        probs = torch.sigmoid(logits)
+        preds = (probs >= 0.5).long()
+
+        total_loss += loss * n_batch
+        total_nodes += n_batch
+        all_true.append(batch.y.detach().cpu().numpy())
+        all_pred.append(preds.detach().cpu().numpy())
+
+    y_true = np.concatenate(all_true, axis=0) if all_true else np.zeros((0,), dtype=np.int64)
+    y_pred = np.concatenate(all_pred, axis=0) if all_pred else np.zeros((0,), dtype=np.int64)
+    avg_loss = total_loss / max(1, total_nodes)
     metrics = compute_classification_metrics(y_true, y_pred)
-    return loss, metrics, y_true, y_pred
+    return avg_loss, metrics, y_true, y_pred
+
+
+def _forward_train_batch(model: nn.Module, batch: Data) -> torch.Tensor:
+    """
+    Executa forward em modo de treino. Se um mini-batch contiver apenas 1 nó total,
+    coloca temporariamente camadas BatchNorm1d em modo eval() para evitar ValueError.
+    """
+    if batch.x.size(0) == 1:
+        bn_modules = [m for m in model.modules() if isinstance(m, nn.BatchNorm1d)]
+        for m in bn_modules:
+            m.eval()
+        logits = model(batch.x, batch.edge_index)
+        for m in bn_modules:
+            m.train()
+        return logits
+    return model(batch.x, batch.edge_index)
 
 
 def train_and_evaluate(
-    train_g: Data,
-    val_g: Data,
-    test_g: Data,
+    train_g: Union[Data, List[Data]],
+    val_g: Union[Data, List[Data]],
+    test_g: Union[Data, List[Data]],
     epochs: int = 30,
     lr: float = 0.001,
     patience: int = 7,
@@ -245,31 +298,44 @@ def train_and_evaluate(
     device: Optional[torch.device] = None,
     checkpoint_out: str = "data/processed/best_model_clean.pth",
     ablation_no_graph: bool = False,
+    batch_size: int = 8,
 ) -> Dict[str, object]:
     """
-    Executa o ciclo completo de treinamento guiado por validação e avaliação única no teste reservado.
+    Executa o ciclo completo de treinamento com `torch_geometric.loader.DataLoader` sobre snapshots
+    temporais, guiado exclusivamente pela validação, e avalia o teste reservado uma única vez.
     """
     set_deterministic_seed(seed)
+
+    first_train = train_g[0] if isinstance(train_g, (list, tuple)) else train_g
     if device is None:
-        device = train_g.x.device
+        device = first_train.x.device
+
+    train_list = _normalize_to_graph_list(train_g, device)
+    val_list = _normalize_to_graph_list(val_g, device)
+    test_list = _normalize_to_graph_list(test_g, device)
 
     if ablation_no_graph:
-        train_g = apply_self_loop_only(train_g)
-        val_g = apply_self_loop_only(val_g)
-        test_g = apply_self_loop_only(test_g)
+        train_list = [apply_self_loop_only(g) for g in train_list]
+        val_list = [apply_self_loop_only(g) for g in val_list]
+        test_list = [apply_self_loop_only(g) for g in test_list]
 
+    train_loader = DataLoader(train_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
+    val_loader = DataLoader(val_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
+    test_loader = DataLoader(test_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
+
+    sample_g = train_list[0]
     model = SPECTRE_GRID(
-        num_features=train_g.x.shape[2],
-        seq_len=train_g.x.shape[1],
+        num_features=sample_g.x.shape[2],
+        seq_len=sample_g.x.shape[1],
         cnn_out_channels=32,
         lstm_hidden_size=64,
         gnn_hidden_size=64,
         gat_heads=4,
     ).to(device)
 
-    # Calcula pos_weight apenas no conjunto de treino para lidar com desbalanceamento
-    n_pos = float((train_g.y == 1).sum().item())
-    n_neg = float((train_g.y == 0).sum().item())
+    # Calcula pos_weight apenas nos snapshots de treino para lidar com desbalanceamento
+    n_pos = float(sum(int((g.y == 1).sum().item()) for g in train_list))
+    n_neg = float(sum(int((g.y == 0).sum().item()) for g in train_list))
     if n_pos > 0 and n_neg > 0:
         pos_weight = torch.tensor([min(max(n_neg / n_pos, 0.5), 10.0)], dtype=torch.float32, device=device)
         criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
@@ -287,22 +353,35 @@ def train_and_evaluate(
     os.makedirs(os.path.dirname(checkpoint_out) or ".", exist_ok=True)
 
     for epoch in range(1, epochs + 1):
-        # 1. Passo de Treinamento (exclusivamente em train_g)
+        # 1. Passo de Treinamento (exclusivamente nos snapshots de treino)
         model.train()
-        optimizer.zero_grad()
-        train_logits = model(train_g.x, train_g.edge_index)
-        train_loss = criterion(train_logits, train_g.y.float())
-        train_loss.backward()
-        optimizer.step()
+        epoch_train_loss = 0.0
+        epoch_train_nodes = 0
 
-        # 2. Passo de Validação (NOVO forward pass em val_g após atualização dos pesos; test_g NÃO é tocado)
-        val_loss, val_metrics, _, _ = evaluate_graph(model, val_g, criterion)
+        for batch in train_loader:
+            batch = batch.to(device)
+            n_b = int(batch.x.size(0))
+            if n_b == 0:
+                continue
+            optimizer.zero_grad()
+            train_logits = _forward_train_batch(model, batch)
+            train_loss = criterion(train_logits, batch.y.float())
+            train_loss.backward()
+            optimizer.step()
+
+            epoch_train_loss += float(train_loss.item()) * n_b
+            epoch_train_nodes += n_b
+
+        avg_train_loss = epoch_train_loss / max(1, epoch_train_nodes)
+
+        # 2. Passo de Validação (NOVO forward pass agregando todos os snapshots de val; test NÃO é tocado)
+        val_loss, val_metrics, _, _ = evaluate_snapshots(model, val_loader, criterion, device)
         val_f1 = float(val_metrics["f1_score"])
 
         scheduler.step(val_f1)
 
         logging.info(
-            f"Época {epoch:03d}/{epochs} | Train Loss: {train_loss.item():.4f} | "
+            f"Época {epoch:03d}/{epochs} | Train Loss: {avg_train_loss:.4f} | "
             f"Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f} | "
             f"Val Prec: {val_metrics['precision']:.4f} | Val Rec: {val_metrics['recall']:.4f} | "
             f"Val FPR: {val_metrics['fpr']:.4f}"
@@ -326,7 +405,7 @@ def train_and_evaluate(
     # 3. Recarregar o melhor checkpoint escolhido na Validação e avaliar o Teste Reservado UMA ÚNICA VEZ
     state_dict = torch.load(checkpoint_out, map_location=device, weights_only=True)
     model.load_state_dict(state_dict)
-    test_loss, test_metrics, y_test_true, y_test_pred = evaluate_graph(model, test_g, criterion)
+    test_loss, test_metrics, y_test_true, y_test_pred = evaluate_snapshots(model, test_loader, criterion, device)
 
     logging.info(
         f"[TESTE RESERVADO / HELD-OUT] Acc: {test_metrics['accuracy']:.4f} | "
@@ -343,9 +422,9 @@ def train_and_evaluate(
         "y_test_true": y_test_true,
         "y_test_pred": y_test_pred,
         "graph_stats": {
-            "train": edge_statistics(train_g),
-            "val": edge_statistics(val_g),
-            "test": edge_statistics(test_g),
+            "train": edge_statistics(train_list),
+            "val": edge_statistics(val_list),
+            "test": edge_statistics(test_list),
         },
     }
 
@@ -365,17 +444,17 @@ def main():
     logging.info(f"Treinamento iniciado em {device.type.upper()} | Seed: {args.seed}")
 
     raw_obj = torch.load(args.data_path, map_location=device, weights_only=False)
-    train_g, val_g, test_g, meta = load_or_split_graphs(raw_obj, device, args.seed)
+    train_list, val_list, test_list, meta = load_or_split_graphs(raw_obj, device, args.seed)
 
     logging.info(
-        f"Partições carregadas ({meta.get('protocol')}) | "
-        f"Treino: {edge_statistics(train_g)} | Val: {edge_statistics(val_g)} | Teste: {edge_statistics(test_g)}"
+        f"Snapshots carregados ({meta.get('protocol')}) | "
+        f"Treino: {edge_statistics(train_list)} | Val: {edge_statistics(val_list)} | Teste: {edge_statistics(test_list)}"
     )
 
     result = train_and_evaluate(
-        train_g=train_g,
-        val_g=val_g,
-        test_g=test_g,
+        train_g=train_list,
+        val_g=val_list,
+        test_g=test_list,
         epochs=args.epochs,
         lr=args.lr,
         patience=args.patience,
@@ -383,6 +462,7 @@ def main():
         device=device,
         checkpoint_out=args.checkpoint_out,
         ablation_no_graph=args.ablation_no_graph,
+        batch_size=args.batch_size,
     )
 
     save_confusion_matrix(result["y_test_true"], result["y_test_pred"], save_path=args.cm_out)
@@ -390,14 +470,17 @@ def main():
     report = {
         "git_commit": get_git_commit(),
         "seed": args.seed,
+        "device": str(device),
         "data_path": str(args.data_path),
         "protocol": meta.get("protocol"),
+        "feature_scope": meta.get("feature_scope"),
+        "window_sec": meta.get("window_sec"),
         "ablation_no_graph": bool(args.ablation_no_graph),
         "top_features": meta.get("top_features", []),
         "split_rows": meta.get("split_rows", {}),
         "graph_stats": result["graph_stats"],
         "best_epoch_on_validation": result["best_epoch"],
-        "validation_metrics": result["validation_best"],
+        "validation_metrics": result["validation_metrics"] if "validation_metrics" in result else result["validation_best"],
         "held_out_test_metrics": result["test_held_out"],
         "test_mask_used_in_scheduler_or_checkpoint": False,
         "fresh_eval_forward_after_optimizer_step": True,

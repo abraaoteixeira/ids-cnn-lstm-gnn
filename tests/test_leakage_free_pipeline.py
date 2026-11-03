@@ -2,7 +2,8 @@
 tests/test_leakage_free_pipeline.py
 
 Suíte de testes automatizados contra vazamento de dados (Data Leakage),
-poluição de rótulos, desalinhamento de índices temporais e topologias artificiais
+poluição de rótulos, desalinhamento de índices temporais, topologias artificiais,
+violação de causalidade em Snapshots Temporais G_t = (V_t, E_t) e uso de grafos legados
 em `preprocessor.py` e `train.py`.
 """
 
@@ -13,14 +14,25 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
+from sklearn.preprocessing import StandardScaler
+from torch_geometric.data import Data
 
 import preprocessor as pp
 import train as tr
 
 
-def _make_Base_df() -> pd.DataFrame:
+def _make_base_df() -> pd.DataFrame:
     """Cria um DataFrame determinístico com ordem temporal explícita para testes."""
     return pp.generate_test_sample(n=120, seed=123)
+
+
+def _identity_scaler(n_features: int) -> StandardScaler:
+    scaler = StandardScaler()
+    scaler.mean_ = np.zeros((n_features,), dtype=np.float32)
+    scaler.scale_ = np.ones((n_features,), dtype=np.float32)
+    scaler.var_ = np.ones((n_features,), dtype=np.float32)
+    scaler.n_features_in_ = n_features
+    return scaler
 
 
 def test_outlier_in_test_does_not_contaminate_train_scaler_or_pearson():
@@ -29,7 +41,7 @@ def test_outlier_in_test_does_not_contaminate_train_scaler_or_pearson():
     NÃO altera a seleção de features (Pearson), nem a média/desvio do StandardScaler,
     nem os tensores do grafo de treino.
     """
-    df_clean = _make_Base_df()
+    df_clean = _make_base_df()
     df_polluted = df_clean.copy()
 
     # Os últimos 20% pertencem à partição de teste (índices >= 96 para n=120)
@@ -76,14 +88,7 @@ def test_time_col_sorting_preserves_row_feature_alignment():
             {"timestamp": "2026-01-01T00:00:02", "src_ip": "10.0.0.1", "dst_ip": "10.0.1.1", "f0": 200.0, "target": 1},
         ]
     )
-    from sklearn.preprocessing import StandardScaler
-
-    # Scaler identidade para inspecionar os valores exatos na sequência temporal do nó
-    scaler = StandardScaler()
-    scaler.mean_ = np.array([0.0], dtype=np.float32)
-    scaler.scale_ = np.array([1.0], dtype=np.float32)
-    scaler.var_ = np.array([1.0], dtype=np.float32)
-    scaler.n_features_in_ = 1
+    scaler = _identity_scaler(1)
 
     g = pp.build_graph(
         df,
@@ -157,7 +162,7 @@ def test_train_never_uses_test_set_for_scheduler_or_checkpoint():
     pesos salvos em disco dependem EXCLUSIVAMENTE de Treino e Validação: corromper o
     conjunto de Teste não altera em nada os pesos do modelo selecionado nem a melhor época.
     """
-    df = _make_Base_df()
+    df = _make_base_df()
     bundle = pp.build_inductive_splits(df, target_col="target", time_col="timestamp", k=20, seq_len=6)
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -202,3 +207,130 @@ def test_train_never_uses_test_set_for_scheduler_or_checkpoint():
         w2 = torch.load(ckpt2, map_location="cpu", weights_only=True)
         for k in w1:
             assert torch.equal(w1[k], w2[k]), f"Peso '{k}' do checkpoint mudou quando o test set foi alterado!"
+
+
+def test_temporal_snapshots_causality_no_future_edges_and_window_labels():
+    """
+    Verifica nos snapshots temporais G_t = (V_t, E_t):
+      1. Isolamento temporal e ausência de arestas futuras: uma comunicação em t=65s..75s (janela 2)
+         NÃO aparece como nó nem aresta na janela 0 (t=0s..10s).
+      2. Correção dos rótulos por janela: o host 10.0.0.1 que é benigno na janela 0 (target=0) e
+         ataca na janela 2 (target=1) recebe y=0 na janela 0 e y=1 na janela 2.
+      3. Snapshots vazios: o intervalo [30s, 60s) (janela 1) sem eventos é ignorado com segurança,
+         e um DataFrame vazio retorna `[]`.
+      4. Preservação das sequências de features dentro de cada snapshot sem contaminação futura.
+    """
+    assert pp.build_temporal_snapshots(pd.DataFrame(), top_features=["f0"], window_sec=30.0) == []
+
+    df = pd.DataFrame(
+        [
+            # Janela 0: [1000, 1030) -> 10.0.0.1 envia apenas tráfego benigno para 10.0.1.1
+            {"Stime": 1000.0, "srcip": "10.0.0.1", "dstip": "10.0.1.1", "f0": 11.0, "f1": 1.0, "Label": 0},
+            {"Stime": 1010.0, "srcip": "10.0.0.1", "dstip": "10.0.1.1", "f0": 22.0, "f1": 2.0, "Label": 0},
+            # Janela 1: [1030, 1060) -> VAZIA (nenhum fluxo)
+            # Janela 2: [1060, 1090) -> 10.0.0.1 passa a atacar 10.0.1.2, e 10.0.0.9 ataca 10.0.1.99
+            {"Stime": 1065.0, "srcip": "10.0.0.1", "dstip": "10.0.1.2", "f0": 999.0, "f1": 90.0, "Label": 1},
+            {"Stime": 1075.0, "srcip": "10.0.0.9", "dstip": "10.0.1.99", "f0": 888.0, "f1": 80.0, "Label": 1},
+        ]
+    )
+    scaler = _identity_scaler(2)
+    snapshots = pp.build_temporal_snapshots(
+        df,
+        top_features=["f0", "f1"],
+        window_sec=30.0,
+        seq_len=3,
+        time_col="Stime",
+        target_col="Label",
+        scaler=scaler,
+    )
+
+    # Deve conter exatamente 2 snapshots (janelas 0 e 2; a janela 1 vazia foi ignorada)
+    assert len(snapshots) == 2
+    g0, g2 = snapshots[0], snapshots[1]
+    assert g0.window_id == 0
+    assert g2.window_id == 2
+
+    # 1. Ausência de nós e arestas futuras em g0
+    assert set(g0.ip2idx.keys()) == {"10.0.0.1", "10.0.1.1"}
+    assert "10.0.1.2" not in g0.ip2idx, "Destino futuro 10.0.1.2 vazou para o snapshot passado g0!"
+    assert "10.0.0.9" not in g0.ip2idx, "Atacante futuro 10.0.0.9 vazou para o snapshot passado g0!"
+
+    # 2. Rótulo por janela: 10.0.0.1 é benigno (0) em g0 e atacante (1) em g2
+    idx_1_g0 = g0.ip2idx["10.0.0.1"]
+    assert int(g0.y[idx_1_g0].item()) == 0, "10.0.0.1 foi rotulado como atacante antes de atacar!"
+    idx_1_g2 = g2.ip2idx["10.0.0.1"]
+    assert int(g2.y[idx_1_g2].item()) == 1, "10.0.0.1 deveria ser rotulado como atacante na janela g2!"
+    assert int(g2.y[g2.ip2idx["10.0.1.2"]].item()) == 0, "Vítima passiva 10.0.1.2 recebeu label=1 em g2!"
+
+    # 3. Preservação de sequência em g0 (padding 0.0 seguido de 11.0, 22.0; sem o 999.0 futuro!)
+    seq_g0 = g0.x[idx_1_g0, :, 0].numpy().tolist()
+    assert seq_g0 == [0.0, 11.0, 22.0], f"Sequência de features em g0 corrompida ou contaminada pelo futuro: {seq_g0}"
+
+
+def test_dataloader_snapshot_aggregation_and_legacy_single_graph_rejection():
+    """
+    Verifica:
+      1. `train.load_or_split_graphs` rejeita grafos únicos legados (`isinstance(raw_obj, Data)`),
+         impedindo que grafos pré-processados sem isolamento sejam divididos após o fato.
+      2. `train.train_and_evaluate` opera sobre listas de snapshots (`train_snapshots`, `val_snapshots`,
+         `test_snapshots`) com `DataLoader`, agregando as predições de todos os snapshots de teste.
+      3. `feature_scope='ebpf_compatible'` remove colunas L7/pós-conexão (`service`, `res_bdy_len`, etc.).
+    """
+    legacy_single_graph = Data(
+        x=torch.randn(10, 5, 4),
+        edge_index=torch.tensor([[0, 1], [1, 0]], dtype=torch.long),
+        y=torch.zeros(10, dtype=torch.long),
+    )
+    with pytest.raises(ValueError, match="único grafo histórico"):
+        tr.load_or_split_graphs(legacy_single_graph, device=torch.device("cpu"))
+
+    df = pp.generate_test_sample(n=180, seed=77)
+    # Adiciona coluna L7 pós-conexão para testar filtragem de escopo eBPF
+    df["res_bdy_len"] = df["target"] * 5000.0
+
+    bundle = pp.build_inductive_splits(
+        df,
+        target_col="target",
+        time_col="timestamp",
+        k=10,
+        seq_len=5,
+        window_sec=30.0,
+        feature_scope="ebpf_compatible",
+    )
+
+    assert "res_bdy_len" in bundle["dropped_l7_posthoc_cols"]
+    assert "res_bdy_len" not in bundle["top_features"]
+    assert all(not f.startswith("service_") for f in bundle["top_features"])
+
+    assert len(bundle["train_snapshots"]) >= 2
+    assert len(bundle["val_snapshots"]) >= 1
+    assert len(bundle["test_snapshots"]) >= 1
+
+    # Garantir que as janelas de treino, validação e teste não se sobrepõem no tempo
+    max_train_t = max(g.t_end for g in bundle["train_snapshots"])
+    min_val_t = min(g.t_start for g in bundle["val_snapshots"])
+    max_val_t = max(g.t_end for g in bundle["val_snapshots"])
+    min_test_t = min(g.t_start for g in bundle["test_snapshots"])
+    assert max_train_t <= min_val_t + 30.0
+    assert max_val_t <= min_test_t + 30.0
+
+    expected_test_nodes = sum(int(g.x.shape[0]) for g in bundle["test_snapshots"])
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        ckpt = str(Path(tmpdir) / "ckpt_snap.pth")
+        res = tr.train_and_evaluate(
+            train_g=bundle["train_snapshots"],
+            val_g=bundle["val_snapshots"],
+            test_g=bundle["test_snapshots"],
+            epochs=3,
+            lr=0.002,
+            patience=3,
+            seed=42,
+            checkpoint_out=ckpt,
+            batch_size=2,
+        )
+        assert len(res["y_test_true"]) == expected_test_nodes, (
+            f"A avaliação deveria agregar todos os {expected_test_nodes} nós dos snapshots de teste, "
+            f"mas retornou {len(res['y_test_true'])}."
+        )
+        assert res["graph_stats"]["test"]["num_snapshots"] == len(bundle["test_snapshots"])

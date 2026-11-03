@@ -1,16 +1,23 @@
 """
 preprocessor.py
 
-Pipeline de engenharia de features e construção de grafos STGNN livre de vazamento de dados (Leakage-Free).
+Pipeline de engenharia de features e construção de grafos STGNN livre de vazamento de dados (Leakage-Free),
+com suporte a Snapshots Temporais Discretos G_t = (V_t, E_t) e filtragem de features compatíveis com o
+estágio de observação do plano de dados/agregação eBPF.
 
 Protocolo Experimental Rigoroso:
  1. Particionamento temporal/sequencial disjunto (Treino 60% / Validação 20% / Teste 20%) ANTES de qualquer transformação aprendida.
- 2. One-Hot Encoding ajustado no vocabulário de treino e alinhado em validação/teste.
- 3. Seleção das Top-20 features (Correlação Linear de Pearson) calculada EXCLUSIVAMENTE no conjunto de treino.
- 4. Padronização (StandardScaler) ajustada (fit) EXCLUSIVAMENTE no conjunto de treino e aplicada via transform() em validação e teste.
- 5. Construção independente de grafos por partição (avaliação indutiva sem contaminação de arestas futuras):
+ 2. Filtragem opcional de escopo de features (`--feature_scope`):
+    - `ebpf_compatible`: remove atributos de inspeção profunda de payload L7 (HTTP/FTP/body) ou pós-conexão
+      indisponíveis ao agregador de fluxo eBPF/XDP.
+    - `all_flow`: utiliza todos os atributos numéricos/categóricos do fluxo.
+ 3. One-Hot Encoding ajustado no vocabulário de treino e alinhado em validação/teste.
+ 4. Seleção das Top-20 features (Correlação Linear de Pearson) calculada EXCLUSIVAMENTE no conjunto de treino.
+ 5. Padronização (StandardScaler) ajustada (fit) EXCLUSIVAMENTE no conjunto de treino e aplicada via transform() em validação e teste.
+ 6. Construção de Snapshots Temporais Discretos G_t = (V_t, E_t) (ex.: janelas de 30s ou 60s) estritamente dentro
+    de cada partição (sem atravessar fronteiras treino/val/teste e sem incluir eventos futuros):
     - Ordenação temporal prévia à extração matricial (corrige desalinhamento de índices).
-    - Rotulagem restrita ao IP emissor do ataque (não contamina vítimas passivas com label=1).
+    - Rotulagem por janela restrita ao IP emissor do ataque naquela janela (não contamina vítimas passivas nem janelas benignas).
     - Proibição de grafos sequenciais artificiais (i -> i+1) quando não há colunas de IP; modo tabular opcional usa apenas auto-loops (i -> i).
 """
 import argparse
@@ -51,6 +58,19 @@ METADATA_EXCLUDE_COLS = {
     "timestamp", "time", "stime", "ltime", "flow_id", "flow id", "attack_cat", "attack",
 }
 
+# Atributos de inspeção profunda de camada de aplicação (L7 DPI: HTTP/FTP/body) ou números
+# de sequência TCP pós-teardown que NÃO são extraídos pelo struct packet_event do eBPF/XDP.
+L7_POSTHOC_UNSW_COLS = {
+    "service",
+    "trans_depth",
+    "res_bdy_len",
+    "ct_flw_http_mthd",
+    "is_ftp_login",
+    "ct_ftp_cmd",
+    "stcpb",
+    "dtcpb",
+}
+
 
 def _map_target_to_binary(series: pd.Series) -> pd.Series:
     """Converte labels textuais ou numéricas para binário: 0 = benigno/normal, 1 = ataque."""
@@ -59,6 +79,41 @@ def _map_target_to_binary(series: pd.Series) -> pd.Series:
     s = series.astype(str).str.lower().str.strip()
     benign = {"normal", "normal.", "benign", "benign.", "0", "0.0", "false", "nan", ""}
     return (~s.isin(benign)).astype(int)
+
+
+def _parse_time_to_seconds(series: pd.Series) -> np.ndarray:
+    """
+    Converte uma série de tempo (Unix epoch numérico ou string ISO/datetime) em segundos (float64)
+    para particionamento exato em janelas temporais discretas.
+    """
+    if pd.api.types.is_numeric_dtype(series):
+        vals = pd.to_numeric(series, errors="coerce").to_numpy(dtype=np.float64)
+        return vals
+    dt = pd.to_datetime(series, errors="coerce", utc=True)
+    if dt.notna().any():
+        return (dt.astype("int64") / 1e9).to_numpy(dtype=np.float64)
+    return np.arange(len(series), dtype=np.float64)
+
+
+def filter_features_by_observation_scope(
+    df: pd.DataFrame,
+    feature_scope: str = "all_flow",
+) -> Tuple[pd.DataFrame, List[str]]:
+    """
+    Filtra colunas conforme o estágio de observação desejado:
+      - 'all_flow': mantém todas as colunas de fluxo.
+      - 'ebpf_compatible': remove atributos L7/DPI (HTTP/FTP/body) indisponíveis no agregador eBPF.
+    """
+    if feature_scope == "all_flow":
+        return df.copy(), []
+    if feature_scope != "ebpf_compatible":
+        raise ValueError(f"feature_scope inválido: '{feature_scope}'. Use 'all_flow' ou 'ebpf_compatible'.")
+
+    drop_cols = [c for c in df.columns if c.lower() in L7_POSTHOC_UNSW_COLS or any(
+        c.lower().startswith(f"{l7}_") for l7 in L7_POSTHOC_UNSW_COLS
+    )]
+    df_filtered = df.drop(columns=drop_cols, errors="ignore").copy()
+    return df_filtered, drop_cols
 
 
 def load_dataset_csv(csv_path: str, nrows: Optional[int] = None) -> pd.DataFrame:
@@ -213,7 +268,7 @@ def build_graph(
       - Se `scaler` for fornecido, aplica apenas `scaler.transform()` (sem re-fit em val/test).
       - Apenas o nó emissor (`src_ip`) recebe rótulo de atacante (`label=1`) quando emite
         um fluxo malicioso; destinos passivos (`dst_ip`) permanecem no grafo com `label=0`
-        (a menos que eles mesmos emitam fluxos de ataque).
+        (a menos que eles mesmos emitam fluxos de ataque na mesma janela).
       - Se colunas de IP não existirem, rejeita a construção de grafo topológico por padrão
         (`allow_row_fallback=False`). Quando `allow_row_fallback=True` é usado para baselines
         tabulares, cria apenas auto-loops `(i, i)`, jamais ligando linhas adjacentes arbitrárias.
@@ -225,6 +280,20 @@ def build_graph(
 
     src_col = next((c for c in src_cols_priority if c in df.columns), None)
     dst_col = next((c for c in dst_cols_priority if c in df.columns), None)
+
+    num_feat = len(top_features)
+    if len(df) == 0:
+        empty_x = torch.empty((0, seq_len, num_feat), dtype=torch.float32)
+        empty_ei = torch.empty((2, 0), dtype=torch.long)
+        empty_ea = torch.empty((0, num_feat), dtype=torch.float32)
+        empty_y = torch.empty((0,), dtype=torch.long)
+        data = Data(x=empty_x, edge_index=empty_ei, edge_attr=empty_ea, y=empty_y)
+        data.ip2idx = {}
+        data.idx2ip = {}
+        data.scaler = scaler
+        data.top_features = list(top_features)
+        data.topology_mode = "empty_snapshot"
+        return data
 
     # 1. Ordenar cronologicamente ANTES de extrair a matriz de features (evita bug de índice)
     if time_col and time_col in df.columns:
@@ -275,7 +344,6 @@ def build_graph(
         edge_attrs: Dict[Tuple[int, int], np.ndarray] = {}
         node_labels = np.zeros((num_nodes,), dtype=np.int64)
 
-        num_feat = len(top_features)
         for row_idx in range(len(df_valid)):
             s_idx = ip2idx[src_vals[row_idx]]
             d_idx = ip2idx[dst_vals[row_idx]]
@@ -291,13 +359,13 @@ def build_graph(
             edge_counts[ekey] += 1
             edge_attrs[ekey] += feats
 
-            # Apenas o emissor do fluxo malicioso recebe rótulo de atacante
+            # Apenas o emissor do fluxo malicioso recebe rótulo de atacante na janela atual
             if y_valid[row_idx] == 1:
                 node_labels[s_idx] = 1
 
         node_features = np.zeros((num_nodes, seq_len, num_feat), dtype=np.float32)
         for idx in range(num_nodes):
-            # Prioriza histórico de envio; se for vítima puramente passiva, usa histórico recebido
+            # Prioriza histórico de envio até o fim da janela; se for vítima puramente passiva, usa histórico recebido
             vecs = out_vectors.get(idx) or in_vectors.get(idx) or []
             if not vecs:
                 continue
@@ -311,7 +379,7 @@ def build_graph(
 
         if not edge_counts:
             edge_index = torch.empty((2, 0), dtype=torch.long)
-            edge_attr = None
+            edge_attr = torch.empty((0, num_feat), dtype=torch.float32)
         else:
             edges = list(edge_counts.keys())
             edge_index = torch.tensor([[e[0] for e in edges], [e[1] for e in edges]], dtype=torch.long)
@@ -345,26 +413,163 @@ def build_graph(
         "sem arestas sequenciais artificiais entre registros distintos."
     )
     n_rows = len(df_proc)
-    num_feat = len(top_features)
     node_features = np.zeros((n_rows, seq_len, num_feat), dtype=np.float32)
     node_features[:, -1, :] = flat_scaled
     node_labels = y_rows.astype(np.int64)
 
     if n_rows == 0:
         edge_index = torch.empty((2, 0), dtype=torch.long)
+        edge_attr = torch.empty((0, num_feat), dtype=torch.float32)
     else:
         idx_arange = np.arange(n_rows, dtype=np.int64)
         edge_index = torch.tensor(np.vstack([idx_arange, idx_arange]), dtype=torch.long)
+        edge_attr = torch.tensor(flat_scaled, dtype=torch.float32)
 
     x = torch.tensor(node_features, dtype=torch.float32)
     y = torch.tensor(node_labels, dtype=torch.long)
-    data = Data(x=x, edge_index=edge_index, edge_attr=None, y=y)
+    data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y)
     data.scaler = scaler
     data.top_features = list(top_features)
     data.ip2idx = {i: i for i in range(n_rows)}
     data.idx2ip = {i: i for i in range(n_rows)}
     data.topology_mode = "tabular_self_loop_baseline"
     return data
+
+
+def build_temporal_snapshots(
+    df: pd.DataFrame,
+    top_features: List[str],
+    window_sec: float = 60.0,
+    seq_len: int = 10,
+    time_col: Optional[str] = None,
+    src_cols_priority: Optional[List[str]] = None,
+    dst_cols_priority: Optional[List[str]] = None,
+    target_col: str = "target",
+    scaler: Optional[StandardScaler] = None,
+    allow_row_fallback: bool = False,
+) -> List[Data]:
+    """
+    Constrói uma sequência de Snapshots Temporais Discretos G_t = (V_t, E_t) estritamente
+    dentro do DataFrame da partição fornecida.
+
+    Garantias de Causalidade e Isolamento:
+      - Cada janela t contém APENAS os nós V_t e arestas E_t observados no intervalo
+        [t_min + w * window_sec, t_min + (w + 1) * window_sec).
+      - Nenhuma informação de janelas futuras (t' > t) contamina as sequências x ou as arestas de G_t.
+      - Os rótulos y em G_t refletem apenas se o nó emitiu fluxos maliciosos DENTRO da janela t.
+      - Intervalos de tempo sem eventos (snapshots vazios) são ignorados com segurança.
+    """
+    if window_sec <= 0:
+        raise ValueError(f"window_sec deve ser positivo (recebido: {window_sec})")
+
+    if len(df) == 0:
+        return []
+
+    if time_col and time_col in df.columns:
+        df_sorted = df.sort_values(time_col, kind="mergesort").reset_index(drop=True)
+        t_secs = _parse_time_to_seconds(df_sorted[time_col])
+    else:
+        df_sorted = df.reset_index(drop=True)
+        t_secs = np.arange(len(df_sorted), dtype=np.float64)
+
+    valid_time_mask = ~np.isnan(t_secs)
+    if not valid_time_mask.any():
+        return []
+
+    df_sorted = df_sorted.loc[valid_time_mask].reset_index(drop=True)
+    t_secs = t_secs[valid_time_mask]
+
+    t_min = float(t_secs[0])
+    window_ids = np.floor((t_secs - t_min) / float(window_sec)).astype(np.int64)
+    df_sorted = df_sorted.copy()
+    df_sorted["_snapshot_window_id"] = window_ids
+
+    snapshots: List[Data] = []
+    for win_id, group_df in df_sorted.groupby("_snapshot_window_id", sort=True):
+        clean_group = group_df.drop(columns=["_snapshot_window_id"])
+        if len(clean_group) == 0:
+            continue
+        g = build_graph(
+            clean_group,
+            top_features=top_features,
+            seq_len=seq_len,
+            time_col=time_col,
+            src_cols_priority=src_cols_priority,
+            dst_cols_priority=dst_cols_priority,
+            target_col=target_col,
+            scaler=scaler,
+            fit_scaler=False,
+            allow_row_fallback=allow_row_fallback,
+        )
+        if g.x.shape[0] == 0:
+            continue
+        g.window_id = int(win_id)
+        g.t_start = float(t_min + int(win_id) * float(window_sec))
+        g.t_end = float(t_min + (int(win_id) + 1) * float(window_sec))
+        g.num_flows = int(len(clean_group))
+        snapshots.append(g)
+
+    return snapshots
+
+
+def summarize_snapshots(snapshots: List[Data]) -> Dict[str, object]:
+    """
+    Calcula estatísticas agregadas de uma lista de snapshots temporais G_t:
+    quantidade de snapshots, nós totais/médios, arestas reais entre hosts vs. auto-loops,
+    e distribuição de classes (benigno vs. ataque).
+    """
+    if not snapshots:
+        return {
+            "num_snapshots": 0,
+            "total_nodes": 0,
+            "avg_nodes_per_snapshot": 0.0,
+            "min_nodes": 0,
+            "max_nodes": 0,
+            "total_edges": 0,
+            "self_loops": 0,
+            "cross_host_edges": 0,
+            "benign_nodes_0": 0,
+            "attack_nodes_1": 0,
+            "positive_rate": 0.0,
+            "snapshots_with_both_classes": 0,
+        }
+
+    node_counts = [int(g.x.shape[0]) for g in snapshots]
+    total_nodes = int(sum(node_counts))
+    total_edges = 0
+    self_loops = 0
+    cross_host = 0
+    benign_0 = 0
+    attack_1 = 0
+    both_classes = 0
+
+    for g in snapshots:
+        if g.edge_index.numel() > 0:
+            src, dst = g.edge_index[0], g.edge_index[1]
+            total_edges += int(src.numel())
+            self_loops += int((src == dst).sum().item())
+            cross_host += int((src != dst).sum().item())
+        b0 = int((g.y == 0).sum().item())
+        a1 = int((g.y == 1).sum().item())
+        benign_0 += b0
+        attack_1 += a1
+        if b0 > 0 and a1 > 0:
+            both_classes += 1
+
+    return {
+        "num_snapshots": len(snapshots),
+        "total_nodes": total_nodes,
+        "avg_nodes_per_snapshot": round(total_nodes / len(snapshots), 2),
+        "min_nodes": int(min(node_counts)),
+        "max_nodes": int(max(node_counts)),
+        "total_edges": total_edges,
+        "self_loops": self_loops,
+        "cross_host_edges": cross_host,
+        "benign_nodes_0": benign_0,
+        "attack_nodes_1": attack_1,
+        "positive_rate": round(attack_1 / total_nodes, 6) if total_nodes > 0 else 0.0,
+        "snapshots_with_both_classes": both_classes,
+    }
 
 
 def build_inductive_splits(
@@ -377,20 +582,26 @@ def build_inductive_splits(
     val_ratio: float = 0.20,
     categorical_cols: Optional[List[str]] = None,
     allow_row_fallback: bool = False,
+    window_sec: Optional[float] = None,
+    feature_scope: str = "all_flow",
 ) -> Dict[str, object]:
     """
     Executa o protocolo experimental completo sem vazamento de informações:
-      1. Particionamento temporal/sequencial disjunto (60% treino / 20% val / 20% teste).
-      2. One-Hot Encoding ajustado apenas no treino e alinhado em val/teste.
-      3. Seleção de features por Pearson ajustada apenas no treino.
-      4. StandardScaler ajustado apenas no treino.
-      5. Grafos construídos independentemente para treino, validação e teste.
+      1. Filtragem opcional de escopo de observação (`feature_scope`).
+      2. Particionamento temporal/sequencial disjunto (60% treino / 20% val / 20% teste).
+      3. One-Hot Encoding ajustado apenas no treino e alinhado em val/teste.
+      4. Seleção de features por Pearson ajustada apenas no treino.
+      5. StandardScaler ajustado apenas no treino.
+      6. Grafos construídos independentemente para treino, validação e teste, tanto em visão
+         agregada por partição quanto em Snapshots Temporais Discretos G_t (quando `window_sec` > 0).
     """
     if categorical_cols is None:
         categorical_cols = ["protocol_type", "service", "flag", "proto", "state"]
 
+    df_scoped, dropped_scope_cols = filter_features_by_observation_scope(df, feature_scope=feature_scope)
+
     train_raw, val_raw, test_raw = split_dataframe_temporal(
-        df, time_col=time_col, train_ratio=train_ratio, val_ratio=val_ratio
+        df_scoped, time_col=time_col, train_ratio=train_ratio, val_ratio=val_ratio
     )
 
     train_enc = one_hot_encode(train_raw, categorical_cols)
@@ -432,11 +643,60 @@ def build_inductive_splits(
         allow_row_fallback=allow_row_fallback,
     )
 
+    if window_sec is not None and window_sec > 0:
+        train_snapshots = build_temporal_snapshots(
+            train_enc,
+            top_features=top_features,
+            window_sec=window_sec,
+            seq_len=seq_len,
+            time_col=time_col,
+            target_col=target_col,
+            scaler=scaler,
+            allow_row_fallback=allow_row_fallback,
+        )
+        val_snapshots = build_temporal_snapshots(
+            val_enc,
+            top_features=top_features,
+            window_sec=window_sec,
+            seq_len=seq_len,
+            time_col=time_col,
+            target_col=target_col,
+            scaler=scaler,
+            allow_row_fallback=allow_row_fallback,
+        )
+        test_snapshots = build_temporal_snapshots(
+            test_enc,
+            top_features=top_features,
+            window_sec=window_sec,
+            seq_len=seq_len,
+            time_col=time_col,
+            target_col=target_col,
+            scaler=scaler,
+            allow_row_fallback=allow_row_fallback,
+        )
+        protocol_name = f"inductive_temporal_snapshots_{int(window_sec)}s_60_20_20"
+    else:
+        train_snapshots = [train_graph]
+        val_snapshots = [val_graph]
+        test_snapshots = [test_graph]
+        protocol_name = "inductive_temporal_60_20_20"
+
     return {
-        "protocol": "inductive_temporal_60_20_20",
+        "protocol": protocol_name,
+        "feature_scope": feature_scope,
+        "dropped_l7_posthoc_cols": dropped_scope_cols,
+        "window_sec": window_sec,
         "train": train_graph,
         "val": val_graph,
         "test": test_graph,
+        "train_snapshots": train_snapshots,
+        "val_snapshots": val_snapshots,
+        "test_snapshots": test_snapshots,
+        "snapshot_summary": {
+            "train": summarize_snapshots(train_snapshots),
+            "val": summarize_snapshots(val_snapshots),
+            "test": summarize_snapshots(test_snapshots),
+        },
         "top_features": top_features,
         "scaler_mean": scaler.mean_.tolist(),
         "scaler_scale": scaler.scale_.tolist(),
@@ -505,9 +765,16 @@ def generate_test_sample(out_csv: Optional[str] = None, n: int = 300, seed: int 
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Preprocessor Leakage-Free: Split 60/20/20, Top-20 Pearson, Graph Builder")
+    p = argparse.ArgumentParser(description="Preprocessor Leakage-Free: Split 60/20/20, Snapshots Temporais, Top-20 Pearson")
     p.add_argument("--input_csv", required=False, help="CSV de input (se omitido, usa generate_test_sample)")
     p.add_argument("--time_col", default=None, help="Coluna de tempo (ex: Stime, timestamp)")
+    p.add_argument("--window_sec", type=float, default=60.0, help="Janela temporal em segundos para snapshots G_t (0 desativa snapshots)")
+    p.add_argument(
+        "--feature_scope",
+        default="ebpf_compatible",
+        choices=["ebpf_compatible", "all_flow"],
+        help="Escopo de features: 'ebpf_compatible' exclui atributos L7/DPI pós-conexão; 'all_flow' usa todos",
+    )
     p.add_argument("--seq_len", type=int, default=10)
     p.add_argument("--target_col", default="target")
     p.add_argument("--max_rows", type=int, default=None, help="Limite opcional de linhas lidas do CSV")
@@ -519,7 +786,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    logging.info("Preprocessor (Leakage-Free) iniciado")
+    logging.info("Preprocessor (Leakage-Free + Temporal Snapshots) iniciado")
 
     if args.input_csv:
         df = load_dataset_csv(args.input_csv, nrows=args.max_rows)
@@ -540,6 +807,7 @@ def main():
                 time_col = candidate
                 break
 
+    win_sec = args.window_sec if (args.window_sec and args.window_sec > 0) else None
     bundle = build_inductive_splits(
         df,
         target_col=target_col,
@@ -547,22 +815,23 @@ def main():
         k=20,
         seq_len=args.seq_len,
         allow_row_fallback=args.allow_row_fallback,
+        window_sec=win_sec,
+        feature_scope=args.feature_scope,
     )
 
     out_json = Path(args.topk_json)
     out_json.parent.mkdir(parents=True, exist_ok=True)
     with open(out_json, "w", encoding="utf-8") as f:
         json.dump(bundle["top_features"], f, indent=2)
-    logging.info(f"Top-20 features (ajustadas apenas no treino) salvas em {out_json}")
+    logging.info(f"Top-20 features ({args.feature_scope}, ajustadas apenas no treino) salvas em {out_json}")
 
     out_pt = Path(args.output_pt)
     out_pt.parent.mkdir(parents=True, exist_ok=True)
     torch.save(bundle, str(out_pt))
     logging.info(
-        f"Partições indutivas salvas em {out_pt} | "
-        f"Treino: {bundle['train'].x.shape[0]} nós ({bundle['train'].edge_index.shape[1]} arestas) | "
-        f"Val: {bundle['val'].x.shape[0]} nós ({bundle['val'].edge_index.shape[1]} arestas) | "
-        f"Teste: {bundle['test'].x.shape[0]} nós ({bundle['test'].edge_index.shape[1]} arestas)"
+        f"Partições e Snapshots salvos em {out_pt} | Protocolo: {bundle['protocol']} | "
+        f"Resumo Snapshots -> Treino: {bundle['snapshot_summary']['train']} | "
+        f"Val: {bundle['snapshot_summary']['val']} | Teste: {bundle['snapshot_summary']['test']}"
     )
 
 
