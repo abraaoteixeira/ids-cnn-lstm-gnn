@@ -84,14 +84,15 @@ def _map_target_to_binary(series: pd.Series) -> pd.Series:
 def _parse_time_to_seconds(series: pd.Series) -> np.ndarray:
     """
     Converte uma série de tempo (Unix epoch numérico ou string ISO/datetime) em segundos (float64)
-    para particionamento exato em janelas temporais discretas.
+    para particionamento exato em janelas temporais discretas (compatível com Pandas 2.x e 3.x).
     """
     if pd.api.types.is_numeric_dtype(series):
         vals = pd.to_numeric(series, errors="coerce").to_numpy(dtype=np.float64)
         return vals
     dt = pd.to_datetime(series, errors="coerce", utc=True)
     if dt.notna().any():
-        return (dt.astype("int64") / 1e9).to_numpy(dtype=np.float64)
+        epoch = pd.Timestamp("1970-01-01", tz="UTC")
+        return ((dt - epoch) / pd.Timedelta(seconds=1)).to_numpy(dtype=np.float64)
     return np.arange(len(series), dtype=np.float64)
 
 
