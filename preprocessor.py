@@ -71,6 +71,32 @@ L7_POSTHOC_UNSW_COLS = {
     "dtcpb",
 }
 
+# Atributos que exigem correlação bidirecional (dst -> src) ou tabelas rolantes multi-fluxo
+# (LTM de 100 conexões) indisponíveis no sensor XDP ingress unidirecional (`spectre_xdp.c`).
+BIDIR_AND_LTM_UNSW_COLS = {
+    "dbytes",
+    "dttl",
+    "dloss",
+    "dload",
+    "dpkts",
+    "dwin",
+    "dmeansz",
+    "djit",
+    "dintpkt",
+    "tcprtt",
+    "synack",
+    "ackdat",
+    "ct_state_ttl",
+    "ct_srv_src",
+    "ct_srv_dst",
+    "ct_dst_ltm",
+    "ct_src_ltm",
+    "ct_src_dport_ltm",
+    "ct_dst_sport_ltm",
+    "ct_dst_src_ltm",
+    "state",
+}
+
 
 def _map_target_to_binary(series: pd.Series) -> pd.Series:
     """Converte labels textuais ou numéricas para binário: 0 = benigno/normal, 1 = ataque."""
@@ -103,24 +129,47 @@ def filter_features_by_observation_scope(
     """
     Filtra colunas conforme o estágio de observação desejado:
       - 'all_flow': mantém todas as colunas de fluxo.
-      - 'ebpf_compatible': remove atributos L7/DPI (HTTP/FTP/body) indisponíveis no agregador eBPF.
+      - 'ebpf_compatible' (Modalidade A — Benchmark Offline L3/L4 sem DPI): remove atributos L7/DPI (HTTP/FTP/body).
+      - 'ebpf_sensor_strict' (Modalidade B — Modelo Operacional eBPF/XDP Unidirecional): mantém apenas
+        atributos unidirecionais de ingresso (src -> dst) e deriva contadores logarítmicos/taxas de `loader_fusion_v2.cpp`.
     """
     if feature_scope == "all_flow":
         return df.copy(), []
-    if feature_scope != "ebpf_compatible":
-        raise ValueError(f"feature_scope inválido: '{feature_scope}'. Use 'all_flow' ou 'ebpf_compatible'.")
+    if feature_scope not in ("ebpf_compatible", "ebpf_sensor_strict"):
+        raise ValueError(
+            f"feature_scope inválido: '{feature_scope}'. Use 'all_flow', 'ebpf_compatible' ou 'ebpf_sensor_strict'."
+        )
 
-    drop_cols = [c for c in df.columns if c.lower() in L7_POSTHOC_UNSW_COLS or any(
-        c.lower().startswith(f"{l7}_") for l7 in L7_POSTHOC_UNSW_COLS
-    )]
+    excluded_set = set(L7_POSTHOC_UNSW_COLS)
+    if feature_scope == "ebpf_sensor_strict":
+        excluded_set |= BIDIR_AND_LTM_UNSW_COLS
+
+    drop_cols = [
+        c for c in df.columns
+        if c.lower() in excluded_set or any(c.lower().startswith(f"{ex}_") for ex in excluded_set)
+    ]
     df_filtered = df.drop(columns=drop_cols, errors="ignore").copy()
+
+    if feature_scope == "ebpf_sensor_strict":
+        # Derivadas determinísticas por linha (sem vazamento entre fluxos) idênticas a `derive_features()` em loader_fusion_v2.cpp
+        if "sbytes" in df_filtered.columns:
+            sb = pd.to_numeric(df_filtered["sbytes"], errors="coerce").fillna(0.0).clip(lower=0.0)
+            df_filtered["ebpf_log1p_sbytes"] = np.log1p(sb.to_numpy(dtype=np.float64))
+        if "Spkts" in df_filtered.columns:
+            sp = pd.to_numeric(df_filtered["Spkts"], errors="coerce").fillna(0.0).clip(lower=0.0)
+            df_filtered["ebpf_log1p_spkts"] = np.log1p(sp.to_numpy(dtype=np.float64))
+            if "dur" in df_filtered.columns:
+                dur = pd.to_numeric(df_filtered["dur"], errors="coerce").fillna(0.0).clip(lower=1e-6)
+                df_filtered["ebpf_spkts_per_sec"] = (sp / dur).to_numpy(dtype=np.float64)
+
     return df_filtered, drop_cols
 
 
-def load_dataset_csv(csv_path: str, nrows: Optional[int] = None) -> pd.DataFrame:
+def load_dataset_csv(csv_path: str, nrows: Optional[int] = None, skip_rows: int = 0) -> pd.DataFrame:
     """
     Carrega CSV de tráfego, removendo espaços extras em nomes de colunas e detectando
     automaticamente arquivos UNSW-NB15 sem cabeçalho (49 colunas).
+    Permite `skip_rows` para ler fatias posteriores (ex.: linhas 200.000..700.001) sem tocar no treino.
     """
     sample = pd.read_csv(csv_path, nrows=5, header=None, low_memory=False)
     first_val = str(sample.iloc[0, 0]).strip()
@@ -128,12 +177,20 @@ def load_dataset_csv(csv_path: str, nrows: Optional[int] = None) -> pd.DataFrame
 
     if sample.shape[1] == 49 and is_ip_first:
         logging.info("Detectado formato UNSW-NB15 bruto (49 colunas sem cabeçalho).")
-        df = pd.read_csv(csv_path, names=UNSW_NB15_COLUMNS, header=None, nrows=nrows, low_memory=False)
+        df = pd.read_csv(
+            csv_path,
+            names=UNSW_NB15_COLUMNS,
+            header=None,
+            skiprows=int(skip_rows) if skip_rows > 0 else None,
+            nrows=nrows,
+            low_memory=False,
+        )
         for col in ["sport", "dsport", "ct_ftp_cmd", "ct_flw_http_mthd", "is_ftp_login"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
     else:
-        df = pd.read_csv(csv_path, nrows=nrows, low_memory=False)
+        skip_arg = range(1, int(skip_rows) + 1) if skip_rows > 0 else None
+        df = pd.read_csv(csv_path, skiprows=skip_arg, nrows=nrows, low_memory=False)
         df.columns = [str(c).strip() for c in df.columns]
 
     return df
@@ -702,6 +759,8 @@ def build_inductive_splits(
         "snapshot_summary": snap_summary,
         "snapshot_stats": snap_summary,
         "top_features": top_features,
+        "expected_encoded_columns": expected_cols,
+        "categorical_cols": list(categorical_cols),
         "scaler_mean": scaler.mean_.tolist(),
         "scaler_scale": scaler.scale_.tolist(),
         "split_rows": {
@@ -709,6 +768,105 @@ def build_inductive_splits(
             "val": len(val_raw),
             "test": len(test_raw),
         },
+    }
+
+
+def reconstruct_scaler_from_bundle(reference_bundle: Dict[str, object]) -> StandardScaler:
+    """
+    Reconstrói um `StandardScaler` congelado a partir de `scaler_mean` e `scaler_scale`
+    do bundle de referência, SEM jamais executar `.fit()` em dados de validação, teste ou externos.
+    """
+    if "train" in reference_bundle and hasattr(reference_bundle["train"], "scaler") and reference_bundle["train"].scaler is not None:
+        return reference_bundle["train"].scaler
+
+    mean_arr = np.asarray(reference_bundle["scaler_mean"], dtype=np.float64)
+    scale_arr = np.asarray(reference_bundle["scaler_scale"], dtype=np.float64)
+    scaler = StandardScaler()
+    scaler.mean_ = mean_arr
+    scaler.scale_ = scale_arr
+    scaler.var_ = scale_arr ** 2
+    scaler.n_features_in_ = int(len(mean_arr))
+    return scaler
+
+
+def transform_external_dataframe_to_snapshots(
+    df: pd.DataFrame,
+    reference_bundle: Dict[str, object],
+    window_sec: Optional[float] = None,
+    seq_len: int = 10,
+    time_col: Optional[str] = None,
+    target_col: str = "target",
+    allow_row_fallback: bool = False,
+) -> Dict[str, object]:
+    """
+    Transforma um DataFrame externo (ex.: os 500.001 registros posteriores do UNSW-NB15_1 ou
+    uma segunda captura como UNSW-NB15_2.csv) usando EXCLUSIVAMENTE os artefatos estatísticos
+    ajustados no conjunto de treino do `reference_bundle`:
+      - Mesmo `feature_scope`
+      - Mesmo vocabulário One-Hot (`expected_encoded_columns` / `top_features`)
+      - Mesmas `top_features` selecionadas por Pearson no treino
+      - Mesmo `StandardScaler` (`scaler_mean`, `scaler_scale`) ajustado no treino
+    NENHUM parâmetro estatístico é reajustado nos dados externos.
+    """
+    feature_scope = str(reference_bundle.get("feature_scope", "ebpf_compatible"))
+    top_features = list(reference_bundle["top_features"])
+    categorical_cols = list(reference_bundle.get("categorical_cols", ["protocol_type", "service", "flag", "proto", "state"]))
+    expected_cols = reference_bundle.get("expected_encoded_columns", None)
+    scaler = reconstruct_scaler_from_bundle(reference_bundle)
+
+    win_sec = window_sec if window_sec is not None else reference_bundle.get("window_sec", 30.0)
+
+    df_scoped, dropped_scope_cols = filter_features_by_observation_scope(df, feature_scope=feature_scope)
+    if time_col and time_col in df_scoped.columns:
+        df_scoped = df_scoped.sort_values(time_col, kind="mergesort").reset_index(drop=True)
+    else:
+        df_scoped = df_scoped.reset_index(drop=True)
+
+    df_enc = one_hot_encode(df_scoped, categorical_cols, expected_columns=expected_cols)
+    for feat in top_features:
+        if feat not in df_enc.columns:
+            df_enc[feat] = 0.0
+
+    ext_graph = build_graph(
+        df_enc,
+        top_features=top_features,
+        seq_len=seq_len,
+        time_col=time_col,
+        target_col=target_col,
+        scaler=scaler,
+        fit_scaler=False,
+        allow_row_fallback=allow_row_fallback,
+    )
+
+    if win_sec is not None and float(win_sec) > 0:
+        ext_snapshots = build_temporal_snapshots(
+            df_enc,
+            top_features=top_features,
+            window_sec=float(win_sec),
+            seq_len=seq_len,
+            time_col=time_col,
+            target_col=target_col,
+            scaler=scaler,
+            allow_row_fallback=allow_row_fallback,
+        )
+    else:
+        ext_snapshots = [ext_graph]
+
+    ext_summary = summarize_snapshots(ext_snapshots)
+    return {
+        "protocol": f"external_frozen_transform_{int(win_sec) if win_sec else 0}s",
+        "feature_scope": feature_scope,
+        "dropped_l7_posthoc_cols": dropped_scope_cols,
+        "window_sec": win_sec,
+        "external_graph": ext_graph,
+        "external_snapshots": ext_snapshots,
+        "snapshot_summary": {"external": ext_summary},
+        "snapshot_stats": {"external": ext_summary},
+        "top_features": top_features,
+        "scaler_mean": scaler.mean_.tolist(),
+        "scaler_scale": scaler.scale_.tolist(),
+        "external_rows": len(df_scoped),
+        "refitted_on_external": False,
     }
 
 
@@ -776,12 +934,18 @@ def parse_args():
     p.add_argument(
         "--feature_scope",
         default="ebpf_compatible",
-        choices=["ebpf_compatible", "all_flow"],
-        help="Escopo de features: 'ebpf_compatible' exclui atributos L7/DPI pós-conexão; 'all_flow' usa todos",
+        choices=["ebpf_compatible", "ebpf_sensor_strict", "all_flow"],
+        help=(
+            "Escopo de features: 'ebpf_compatible' (Modalidade A: L3/L4 sem DPI), "
+            "'ebpf_sensor_strict' (Modalidade B: apenas contadores unidirecionais do XDP ingress), "
+            "'all_flow' (todos os atributos)"
+        ),
     )
     p.add_argument("--seq_len", type=int, default=10)
     p.add_argument("--target_col", default="target")
+    p.add_argument("--skip_rows", type=int, default=0, help="Número de linhas iniciais a pular no CSV (ex.: 200000 para ler cauda externa)")
     p.add_argument("--max_rows", type=int, default=None, help="Limite opcional de linhas lidas do CSV")
+    p.add_argument("--reference_bundle", default=None, help="Se fornecido, transforma dados externos usando o scaler/features congelados deste bundle sem reajuste")
     p.add_argument("--allow_row_fallback", action="store_true", help="Permitir baseline com auto-loops se não houver IPs")
     p.add_argument("--output_pt", default=str(PROCESSED_DIR / "network_graph_splits.pt"))
     p.add_argument("--topk_json", default=str(PROCESSED_DIR / "top20_features_clean.json"))
@@ -793,7 +957,7 @@ def main():
     logging.info("Preprocessor (Leakage-Free + Temporal Snapshots) iniciado")
 
     if args.input_csv:
-        df = load_dataset_csv(args.input_csv, nrows=args.max_rows)
+        df = load_dataset_csv(args.input_csv, nrows=args.max_rows, skip_rows=args.skip_rows)
     else:
         logging.info("Nenhum input_csv fornecido; gerando amostra sintética determinística...")
         df = generate_test_sample(n=600)
@@ -812,6 +976,26 @@ def main():
                 break
 
     win_sec = args.window_sec if (args.window_sec and args.window_sec > 0) else None
+    if args.reference_bundle:
+        ref_bundle = torch.load(args.reference_bundle, map_location="cpu", weights_only=False)
+        bundle = transform_external_dataframe_to_snapshots(
+            df,
+            reference_bundle=ref_bundle,
+            window_sec=win_sec,
+            seq_len=args.seq_len,
+            time_col=time_col,
+            target_col=target_col,
+            allow_row_fallback=args.allow_row_fallback,
+        )
+        out_pt = Path(args.output_pt)
+        out_pt.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(bundle, str(out_pt))
+        logging.info(
+            f"Snapshots Externos (Sem Reajuste) salvos em {out_pt} | Protocolo: {bundle['protocol']} | "
+            f"Resumo Externo: {bundle['snapshot_summary']['external']}"
+        )
+        return
+
     bundle = build_inductive_splits(
         df,
         target_col=target_col,

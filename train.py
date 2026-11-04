@@ -111,13 +111,22 @@ def parse_args():
     parser.add_argument(
         "--model_variant",
         default="cnn_lstm_gat",
-        choices=["cnn_lstm_gat", "cnn_lstm_pure", "gat_self_loop"],
-        help="Variante arquitetural: 'cnn_lstm_gat' (completo), 'cnn_lstm_pure' (sem camada GAT) ou 'gat_self_loop'",
+        choices=["cnn_lstm_gat", "cnn_lstm_pure", "gat_self_loop", "gat_reverse", "gat_bidir", "gat_residual"],
+        help=(
+            "Variante arquitetural: 'cnn_lstm_gat' (completo src->dst), 'cnn_lstm_pure' (sem GAT), "
+            "'gat_self_loop' (apenas auto-loops), 'gat_reverse' (arestas reversas dst->src), "
+            "'gat_bidir' (arestas bidirecionais src<->dst) ou 'gat_residual' (GAT com conexão residual)"
+        ),
     )
     parser.add_argument(
         "--val_only",
         action="store_true",
         help="Modo exploratório: treina e avalia APENAS na validação, sem consultar o conjunto de teste reservado",
+    )
+    parser.add_argument(
+        "--dataset_sha256",
+        default=None,
+        help="SHA256 opcional do CSV de origem para registro de auditoria no relatório JSON",
     )
     return parser.parse_args()
 
@@ -242,6 +251,97 @@ def apply_self_loop_only(graph: Data) -> Data:
     return Data(x=graph.x, edge_index=edge_index, y=graph.y)
 
 
+def apply_reverse_edges(graph: Data) -> Data:
+    """Variante experimental: inverte a direção das arestas observadas (dst -> src)."""
+    if graph.edge_index.numel() == 0:
+        return Data(x=graph.x, edge_index=graph.edge_index, y=graph.y)
+    rev_ei = torch.stack([graph.edge_index[1], graph.edge_index[0]], dim=0)
+    return Data(x=graph.x, edge_index=rev_ei, y=graph.y)
+
+
+def apply_bidirectional_edges(graph: Data) -> Data:
+    """Variante experimental: torna o grafo bidirecional (src -> dst e dst -> src)."""
+    if graph.edge_index.numel() == 0:
+        return Data(x=graph.x, edge_index=graph.edge_index, y=graph.y)
+    rev_ei = torch.stack([graph.edge_index[1], graph.edge_index[0]], dim=0)
+    bi_ei = torch.unique(torch.cat([graph.edge_index, rev_ei], dim=1), dim=1)
+    return Data(x=graph.x, edge_index=bi_ei, y=graph.y)
+
+
+def compute_heterophily_and_node_group_metrics(
+    orig_graphs: List[Data],
+    y_pred_concat: np.ndarray,
+) -> Dict[str, object]:
+    """
+    Calcula a contagem de arestas entre classes (0->0, 1->0, 0->1, 1->1) nos snapshots originais
+    e decompõe a taxa de falsos positivos (FPR) entre:
+      - Vítimas benignas alvejadas por atacantes (>= 1 aresta recebida 1 -> 0 na janela)
+      - Hosts benignos não alvejados (0 arestas 1 -> 0 recebidas na janela)
+    """
+    e00 = e01 = e10 = e11 = 0
+    fp_targeted = tn_targeted = 0
+    fp_untargeted = tn_untargeted = 0
+    offset = 0
+
+    for g in orig_graphs:
+        y = g.y.detach().cpu()
+        ei = g.edge_index.detach().cpu()
+        n = int(y.numel())
+        preds_g = y_pred_concat[offset : offset + n] if len(y_pred_concat) >= offset + n else np.zeros((n,), dtype=np.int64)
+        offset += n
+
+        if ei.numel() > 0:
+            mask = ei[0] != ei[1]
+            u_cross, v_cross = ei[0][mask], ei[1][mask]
+            yu, yv = y[u_cross], y[v_cross]
+            e00 += int(((yu == 0) & (yv == 0)).sum().item())
+            e01 += int(((yu == 0) & (yv == 1)).sum().item())
+            e10 += int(((yu == 1) & (yv == 0)).sum().item())
+            e11 += int(((yu == 1) & (yv == 1)).sum().item())
+        else:
+            u_cross = torch.empty((0,), dtype=torch.long)
+            v_cross = torch.empty((0,), dtype=torch.long)
+
+        for idx in range(n):
+            if int(y[idx].item()) == 0:
+                in_sources = u_cross[v_cross == idx] if u_cross.numel() > 0 else torch.empty((0,), dtype=torch.long)
+                targeted = bool((y[in_sources] == 1).any().item()) if in_sources.numel() > 0 else False
+                pred_label = int(preds_g[idx])
+                if targeted:
+                    if pred_label == 1:
+                        fp_targeted += 1
+                    else:
+                        tn_targeted += 1
+                else:
+                    if pred_label == 1:
+                        fp_untargeted += 1
+                    else:
+                        tn_untargeted += 1
+
+    tot_targeted = fp_targeted + tn_targeted
+    tot_untargeted = fp_untargeted + tn_untargeted
+    return {
+        "cross_host_edges_by_label": {
+            "0_to_0": e00,
+            "1_to_0": e10,
+            "0_to_1": e01,
+            "1_to_1": e11,
+        },
+        "benign_targeted_by_attacker": {
+            "total": tot_targeted,
+            "fp": fp_targeted,
+            "tn": tn_targeted,
+            "fpr": round(fp_targeted / tot_targeted, 6) if tot_targeted > 0 else 0.0,
+        },
+        "benign_untargeted": {
+            "total": tot_untargeted,
+            "fp": fp_untargeted,
+            "tn": tn_untargeted,
+            "fpr": round(fp_untargeted / tot_untargeted, 6) if tot_untargeted > 0 else 0.0,
+        },
+    }
+
+
 def compute_classification_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, object]:
     """Calcula Accuracy, Precision, Recall, F1, FPR e Matriz de Confusão (TN, FP, FN, TP)."""
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
@@ -360,17 +460,30 @@ def train_and_evaluate(
     if device is None:
         device = first_train.x.device
 
-    train_list = _normalize_to_graph_list(train_g, device)
-    val_list = _normalize_to_graph_list(val_g, device)
-    test_list = _normalize_to_graph_list(test_g, device)
+    orig_train_list = _normalize_to_graph_list(train_g, device)
+    orig_val_list = _normalize_to_graph_list(val_g, device)
+    orig_test_list = _normalize_to_graph_list(test_g, device)
 
     effective_variant = "gat_self_loop" if (ablation_no_graph and model_variant == "cnn_lstm_gat") else model_variant
     if effective_variant in ("gat_self_loop", "cnn_lstm_pure") or ablation_no_graph:
-        train_list = [apply_self_loop_only(g) for g in train_list]
-        val_list = [apply_self_loop_only(g) for g in val_list]
-        test_list = [apply_self_loop_only(g) for g in test_list]
+        train_list = [apply_self_loop_only(g) for g in orig_train_list]
+        val_list = [apply_self_loop_only(g) for g in orig_val_list]
+        test_list = [apply_self_loop_only(g) for g in orig_test_list]
+    elif effective_variant == "gat_reverse":
+        train_list = [apply_reverse_edges(g) for g in orig_train_list]
+        val_list = [apply_reverse_edges(g) for g in orig_val_list]
+        test_list = [apply_reverse_edges(g) for g in orig_test_list]
+    elif effective_variant == "gat_bidir":
+        train_list = [apply_bidirectional_edges(g) for g in orig_train_list]
+        val_list = [apply_bidirectional_edges(g) for g in orig_val_list]
+        test_list = [apply_bidirectional_edges(g) for g in orig_test_list]
+    else:
+        train_list = orig_train_list
+        val_list = orig_val_list
+        test_list = orig_test_list
 
     use_gat = effective_variant != "cnn_lstm_pure"
+    use_residual = effective_variant == "gat_residual"
 
     train_loader = DataLoader(train_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
     val_loader = DataLoader(val_list, batch_size=batch_size, shuffle=False, exclude_keys=LOADER_EXCLUDE_KEYS)
@@ -385,6 +498,7 @@ def train_and_evaluate(
         gnn_hidden_size=64,
         gat_heads=4,
         use_gat=use_gat,
+        use_residual=use_residual,
     ).to(device)
 
     # Calcula pos_weight apenas nos snapshots de treino para lidar com desbalanceamento
@@ -405,6 +519,7 @@ def train_and_evaluate(
     epochs_no_improve = 0
     start_epoch = 1
     resumed_from_epoch = 0
+    epoch_history: List[Dict[str, object]] = []
 
     if resume_state_out is None:
         resume_state_out = f"{checkpoint_out}.resume.pt"
@@ -422,7 +537,21 @@ def train_and_evaluate(
         best_epoch = int(state.get("best_epoch", 0))
         epochs_no_improve = int(state.get("epochs_no_improve", 0))
         resumed_from_epoch = int(state.get("epoch", 0))
+        epoch_history = list(state.get("epoch_history", []))
         start_epoch = resumed_from_epoch + 1
+        if "python_rng_state" in state:
+            random.setstate(state["python_rng_state"])
+        if "numpy_rng_state" in state:
+            np.random.set_state(state["numpy_rng_state"])
+        if "torch_cpu_rng_state" in state:
+            torch_cpu_state = state["torch_cpu_rng_state"]
+            if isinstance(torch_cpu_state, torch.Tensor):
+                torch.set_rng_state(torch_cpu_state.cpu().to(torch.uint8))
+        if torch.cuda.is_available() and "torch_cuda_rng_state" in state and state["torch_cuda_rng_state"] is not None:
+            try:
+                torch.cuda.set_rng_state_all([s.cpu().to(torch.uint8) for s in state["torch_cuda_rng_state"]])
+            except Exception:
+                pass
         logging.info(
             f"[RESUME] Retomando treinamento a partir da época {start_epoch} "
             f"(última concluída: {resumed_from_epoch}, melhor Val F1={best_val_f1:.4f} na época {best_epoch})."
@@ -460,6 +589,18 @@ def train_and_evaluate(
 
         scheduler.step(val_f1)
 
+        epoch_history.append(
+            {
+                "epoch": epoch,
+                "train_loss": round(avg_train_loss, 6),
+                "val_loss": round(val_loss, 6),
+                "val_precision": val_metrics["precision"],
+                "val_recall": val_metrics["recall"],
+                "val_f1": val_metrics["f1_score"],
+                "val_fpr": val_metrics["fpr"],
+            }
+        )
+
         logging.info(
             f"Época {epoch:03d}/{epochs} | Train Loss: {avg_train_loss:.4f} | "
             f"Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f} | "
@@ -488,7 +629,12 @@ def train_and_evaluate(
                     "best_val_metrics": best_val_metrics,
                     "best_epoch": best_epoch,
                     "epochs_no_improve": epochs_no_improve,
+                    "epoch_history": epoch_history,
                     "seed": seed,
+                    "python_rng_state": random.getstate(),
+                    "numpy_rng_state": np.random.get_state(),
+                    "torch_cpu_rng_state": torch.get_rng_state(),
+                    "torch_cuda_rng_state": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
                 },
                 resume_state_out,
             )
@@ -511,6 +657,8 @@ def train_and_evaluate(
     )
     if not best_val_metrics:
         best_val_metrics = best_val_eval_metrics
+
+    val_node_group_metrics = compute_heterophily_and_node_group_metrics(orig_val_list, y_val_pred)
 
     if val_only:
         logging.info(
@@ -545,6 +693,8 @@ def train_and_evaluate(
         "resumed_from_epoch": resumed_from_epoch,
         "training_wall_time_sec": training_wall_time_sec,
         "validation_best": best_val_metrics,
+        "validation_node_group_metrics": val_node_group_metrics,
+        "epoch_history": epoch_history,
         "validation_latency": val_latency,
         "y_val_true": y_val_true,
         "y_val_pred": y_val_pred,
@@ -607,10 +757,16 @@ def main():
     elif not args.val_only and len(result["y_test_true"]) > 0:
         save_confusion_matrix(result["y_test_true"], result["y_test_pred"], save_path=args.cm_out)
 
+    gpu_name = torch.cuda.get_device_name(0) if (device.type == "cuda" and torch.cuda.is_available()) else None
     report = {
         "git_commit": get_git_commit(),
+        "dataset_sha256": args.dataset_sha256 or (raw_obj.get("dataset_sha256") if isinstance(raw_obj, dict) else None),
         "seed": args.seed,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
         "device": str(device),
+        "gpu_name": gpu_name,
+        "torch_version": torch.__version__,
         "data_path": str(args.data_path),
         "protocol": meta.get("protocol"),
         "feature_scope": meta.get("feature_scope"),
@@ -621,10 +777,13 @@ def main():
         "top_features": meta.get("top_features", []),
         "split_rows": meta.get("split_rows", {}),
         "graph_stats": result["graph_stats"],
+        "best_epoch": result["best_epoch"],
         "best_epoch_on_validation": result["best_epoch"],
         "resumed_from_epoch": result["resumed_from_epoch"],
         "training_wall_time_sec": result["training_wall_time_sec"],
         "validation_metrics": result["validation_best"],
+        "validation_node_group_metrics": result["validation_node_group_metrics"],
+        "epoch_history": result["epoch_history"],
         "validation_latency": result["validation_latency"],
         "held_out_test_metrics": result["test_held_out"],
         "inference_latency": result["test_latency"],

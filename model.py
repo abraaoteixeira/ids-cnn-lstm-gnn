@@ -54,6 +54,7 @@ class SPECTRE_GRID(nn.Module):
         gat_heads: int = 4,
         dropout: float = 0.3,
         use_gat: bool = True,
+        use_residual: bool = False,
     ) -> None:
         super().__init__()
         self.num_features = num_features
@@ -64,6 +65,7 @@ class SPECTRE_GRID(nn.Module):
         self.gat_heads = gat_heads
         self.dropout = dropout
         self.use_gat = use_gat
+        self.use_residual = use_residual
 
         # =====================================================================
         # CAMADA 1: CNN1D (Extração de Padrões Temporais)
@@ -101,8 +103,10 @@ class SPECTRE_GRID(nn.Module):
                 dropout=dropout,
             )
             fc_input_dim = gnn_hidden_size * gat_heads
+            self.residual_proj = nn.Linear(lstm_hidden_size, fc_input_dim) if self.use_residual else None
         else:
             self.gat = None
+            self.residual_proj = None
             fc_input_dim = lstm_hidden_size
 
         # =====================================================================
@@ -135,6 +139,8 @@ class SPECTRE_GRID(nn.Module):
 
         if self.use_gat and self.gat is not None:
             feat_out = self.gat(h_last, edge_index)  # [N, gnn_hidden_size * gat_heads]
+            if self.use_residual and self.residual_proj is not None:
+                feat_out = feat_out + self.residual_proj(h_last)
         else:
             feat_out = h_last  # [N, lstm_hidden_size] (CNN-LSTM puro)
 
@@ -154,6 +160,8 @@ class SPECTRE_GRID(nn.Module):
 
         if self.use_gat and self.gat is not None:
             gat_out, attention = self.gat(h_last, edge_index, return_attention_weights=True)
+            if self.use_residual and self.residual_proj is not None:
+                gat_out = gat_out + self.residual_proj(h_last)
             logits = self.classifier(gat_out).squeeze(-1)
             return logits, attention
 

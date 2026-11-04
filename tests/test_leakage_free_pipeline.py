@@ -418,6 +418,85 @@ def test_pure_cnn_lstm_variant_and_val_only_mode():
         assert res["model_variant"] == "cnn_lstm_pure"
         assert res["val_only"] is True
         assert res["test_held_out"] is None, "Modo val_only=True não pode retornar métricas do teste reservado!"
+
+
+def test_external_frozen_transform_and_experimental_variants_and_latency_module():
+    """
+    Verifica:
+      1. `transform_external_dataframe_to_snapshots` transforma dados externos (inclusive 100% benignos
+         e com categorias inéditas) usando EXCLUSIVAMENTE o vocabulário One-Hot, Top-K features e
+         `StandardScaler` (`scaler_mean`, `scaler_scale`) ajustados no treino (`refitted_on_external=False`).
+      2. Variantes experimentais (`gat_reverse`, `gat_bidir`, `gat_residual`) executam sem erro e
+         registram `validation_node_group_metrics` e `epoch_history`.
+      3. `benchmark_latency.run_latency_benchmark` calcula p50/p95/p99 separados por etapa.
+    """
+    import benchmark_latency as bl
+
+    df_train_origin = pp.generate_test_sample(n=120, seed=101)
+    ref_bundle = pp.build_inductive_splits(
+        df_train_origin,
+        target_col="target",
+        time_col="timestamp",
+        k=8,
+        seq_len=4,
+        window_sec=60.0,
+        feature_scope="ebpf_compatible",
+    )
+
+    # Cria dataset externo 100% benigno com valores extremos e categoria inédita
+    df_ext = pp.generate_test_sample(n=40, seed=202)
+    df_ext["target"] = 0
+    df_ext["protocol_type"] = "sctp_unseen"
+    df_ext["f0"] = 500.0
+
+    ext_bundle = pp.transform_external_dataframe_to_snapshots(
+        df_ext,
+        reference_bundle=ref_bundle,
+        window_sec=60.0,
+        seq_len=4,
+        time_col="timestamp",
+        target_col="target",
+    )
+    assert ext_bundle["refitted_on_external"] is False
+    assert ext_bundle["top_features"] == ref_bundle["top_features"]
+    assert np.allclose(ext_bundle["scaler_mean"], ref_bundle["scaler_mean"])
+    assert np.allclose(ext_bundle["scaler_scale"], ref_bundle["scaler_scale"])
+    assert ext_bundle["snapshot_summary"]["external"]["attack_nodes_1"] == 0
+    assert ext_bundle["snapshot_summary"]["external"]["benign_nodes_0"] > 0
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for variant in ("gat_reverse", "gat_bidir", "gat_residual"):
+            ckpt = str(Path(tmpdir) / f"{variant}.pth")
+            res = tr.train_and_evaluate(
+                train_g=ref_bundle["train_snapshots"],
+                val_g=ref_bundle["val_snapshots"],
+                test_g=ref_bundle["test_snapshots"],
+                epochs=2,
+                lr=0.002,
+                patience=3,
+                seed=42,
+                checkpoint_out=ckpt,
+                model_variant=variant,
+                val_only=True,
+            )
+            assert res["model_variant"] == variant
+            assert "benign_targeted_by_attacker" in res["validation_node_group_metrics"]
+            assert len(res["epoch_history"]) == 2
+
+        model = tr.SPECTRE_GRID(num_features=8, seq_len=4, use_gat=True, use_residual=True)
+        bench = bl.run_latency_benchmark(
+            snapshots_cpu=ref_bundle["val_snapshots"],
+            model=model,
+            device=torch.device("cpu"),
+            batch_size=2,
+            warmup_runs=1,
+            num_runs=2,
+        )
+        assert "p50" in bench["per_snapshot_streaming_latency"]["pure_neural_inference_ms_per_snapshot"]
+        assert "p95" in bench["per_snapshot_streaming_latency"]["pure_neural_inference_ms_per_snapshot"]
+        assert "p99" in bench["per_snapshot_streaming_latency"]["pure_neural_inference_ms_per_snapshot"]
+        assert bench["latency_scope_separation"]["end_to_end_wan_mitigation_latency_measured"] is False
+
         state = torch.load(ckpt, map_location="cpu", weights_only=True)
         assert all(not k.startswith("gat.") for k in state.keys()), "Modelo cnn_lstm_pure não deve conter parâmetros GATConv!"
 
