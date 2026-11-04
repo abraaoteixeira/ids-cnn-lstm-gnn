@@ -82,7 +82,7 @@ def generate_fig1_architecture():
 
     # Sub-camadas neurais: Unidirectional LSTM
     ax.add_patch(patches.Rectangle((68, 23), 28, 8, facecolor="#FFE0B2", edgecolor=c_box_edge, linewidth=1))
-    ax.text(82, 27, "1D-CNN Feature Extractor\n+ Unidirectional LSTM ($L=5$)", ha="center", va="center", fontsize=8)
+    ax.text(82, 27, "1D-CNN Feature Extractor\n+ Unidirectional LSTM ($L=10$)", ha="center", va="center", fontsize=8)
 
     ax.add_patch(patches.Rectangle((68, 12), 28, 8, facecolor="#FFCC80", edgecolor=c_box_edge, linewidth=1))
     ax.text(82, 16, "GATConv (Rev / Bidir / Res)\n$\\mathbf{h}'_v = \\mathbf{h}_v + \\sum_{u \\in \\mathcal{N}(v)} \\alpha_{vu} \\mathbf{W} \\mathbf{h}_u$", ha="center", va="center", fontsize=7.5)

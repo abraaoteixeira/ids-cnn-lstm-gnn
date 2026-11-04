@@ -101,14 +101,14 @@ For each window $[t, t + \Delta t)$, the engine constructs a causal graph snapsh
 \begin{itemize}
     \item \textbf{Node Set ($V_t$):} The set of unique IP addresses observed actively communicating during the window.
     \item \textbf{Edge Set ($E_t$):} Directed edges $(u, v)$ where host $u$ transmitted traffic to host $v$ during $[t, t + \Delta t)$.
-    \item \textbf{Feature Tensor ($\mathbf{X}_t \in \mathbb{R}^{|V_t| \times L \times D}$):} For each node $v$, we maintain a sequence of its last $L=5$ flow statistical feature vectors, each represented across $D=20$ eBPF-compatible dimensions.
+    \item \textbf{Feature Tensor ($\mathbf{X}_t \in \mathbb{R}^{|V_t| \times L \times D}$):} For each node $v$, we maintain a temporal sequence of its last $L=10$ flow statistical feature vectors (\texttt{seq\_len = 10}), each represented across $D=20$ feature dimensions.
 \end{itemize}
 
 \subsection{Spatio-Temporal Neural Core (STGNN)}
 The neural network architecture consists of temporal feature encoding followed by relational spatial attention.
 
 \subsubsection{Temporal Feature Extractor (1D-CNN + Unidirectional LSTM)}
-For each node $v \in V_t$, its temporal sequence $\mathbf{X}_v \in \mathbb{R}^{L \times D}$ is processed by two consecutive 1D Convolutional layers with kernel size $k=3$, padding $p=1$, and ReLU activations. The output is fed into a unidirectional LSTM layer ($\text{bidirectional} = \text{False}$, hidden dimension $d_h = 64$):
+For each node $v \in V_t$, its temporal sequence matrix $\mathbf{X}_v \in \mathbb{R}^{L \times D}$ (with sequence length $L=10$) is processed by two consecutive 1D Convolutional layers with kernel size $k=3$, padding $p=1$, and ReLU activations. The output is fed into a unidirectional LSTM layer ($\text{bidirectional} = \text{False}$, hidden dimension $d_h = 64$):
 \begin{align}
 \mathbf{C}_v &= \text{ReLU}\left( \text{Conv1D}_2\left( \text{ReLU}\left( \text{Conv1D}_1(\mathbf{X}_v) \right) \right) \right) \\
 \mathbf{h}_v^{(0)} &= \text{LSTM}(\mathbf{C}_v)[:, -1, :] \in \mathbb{R}^{d_h}
@@ -171,30 +171,44 @@ An audit of the UNSW-NB15\_1 dataset ($700{,}001$ records) revealed a distinct t
     \item \textbf{Benign Tail (Rows $200{,}001 \dots 700{,}001$):} Contains $500{,}001$ consecutive flows with \textit{zero} attack records ($100\%$ benign background traffic). Segmented with $\Delta t = 30\text{ s}$, this yields $667$ snapshots ($15{,}900$ unique benign nodes). We utilize this tail strictly as an operational FPR stress-test.
 \end{itemize}
 
-\subsection{eBPF-Compatible Feature Selection}
-We restrict the feature space to $20$ attributes extractable within the Linux kernel eBPF/XDP driver and userspace connection aggregation, summarized in Table~\ref{tab:features}. Complex layer-7 features requiring payload inspection or bidirectional state reconstruction are excluded.
+\subsection{Feature Space and Operational Extraction Boundaries}
+We reconstruct the input feature space directly from the inductive training artifact (\path{data/processed/unsw_full_ebpf_30s_features.json}), preserving the exact names and ranking of all $20$ attributes, enumerated in Table~\ref{tab:features}.
 
 \begin{table}[t]
-\caption{The 20 eBPF-Compatible Features Employed by SPECTRE-GRID}
+\caption{The 20 Input Features in Strict Order (\texttt{unsw\_full\_ebpf\_30s\_features.json})}
 \label{tab:features}
 \centering
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{lll}
+\begin{tabular}{rlll}
 \toprule
-\textbf{Category} & \textbf{Feature Name} & \textbf{Kernel Extraction Mechanism} \\
+\textbf{\#} & \textbf{Feature Name} & \textbf{Description / Protocol Domain} & \textbf{Operational Source / Boundary} \\
 \midrule
-Flow Basics & \texttt{dur}, \texttt{proto}, \texttt{service} & XDP timestamp delta, IP header \\
-Packet Counts & \texttt{spkts}, \texttt{dpkts} & Atomic BPF map increments \\
-Byte Volumes & \texttt{sbytes}, \texttt{dbytes} & Ingress packet length summation \\
-Rate Dynamics & \texttt{rate}, \texttt{sload}, \texttt{dload} & Arithmetic division over window \\
-TCP State & \texttt{sttl}, \texttt{dttl}, \texttt{swin}, \texttt{dwin} & Direct TCP/IP header fields \\
-Buffer Metrics & \texttt{smeansz}, \texttt{dmeansz} & Computed average packet size \\
-Timing Intervals & \texttt{sjit}, \texttt{djit}, \texttt{tcprtt} & Moving window timestamp variance \\
-Window Dynamics & \texttt{synack}, \texttt{ackdat} & In-kernel TCP handshake delta \\
+1 & \texttt{sttl} & Source-to-destination Time-To-Live & Ingress XDP (IP Header) \\
+2 & \texttt{ct\_state\_ttl} & Connection count for matching state \& TTL & Userspace Engine (Host Tracker Table) \\
+3 & \texttt{state\_INT} & Transaction state INT (isolated/no-ack) & Transport State Tracker (One-Hot) \\
+4 & \texttt{ct\_dst\_sport\_ltm} & Connections to same dest. IP \& src. port & Userspace Engine (Host Tracker Table) \\
+5 & \texttt{dttl} & Destination-to-source Time-To-Live & Reverse Flow Tracker (IP Header) \\
+6 & \texttt{tcprtt} & Round-trip time ($\text{synack} + \text{ackdat}$) & Handshake Duration Delta \\
+7 & \texttt{ackdat} & Handshake duration: TCP ACK to data & Handshake Duration Delta \\
+8 & \texttt{proto\_unas} & Protocol unassigned indicator & IP Header (Protocol Field, One-Hot) \\
+9 & \texttt{synack} & Handshake duration: TCP SYN to SYN-ACK & Handshake Duration Delta \\
+10 & \texttt{ct\_src\_dport\_ltm} & Connections from src. IP to dest. port & Userspace Engine (Host Tracker Table) \\
+11 & \texttt{Sload} & Source bits per second (throughput) & Flow Volume Metric over Window $\Delta t$ \\
+12 & \texttt{dmeansz} & Mean packet size transmitted by dest. & Flow Volume Metric over Window $\Delta t$ \\
+13 & \texttt{Dload} & Destination bits per second (throughput) & Flow Volume Metric over Window $\Delta t$ \\
+14 & \texttt{state\_CON} & Transaction state CON (connected/established) & Transport State Tracker (One-Hot) \\
+15 & \texttt{dsport} & Destination transport port number & Ingress XDP (TCP/UDP Header) \\
+16 & \texttt{ct\_dst\_src\_ltm} & Connections between same src. and dest. & Userspace Engine (Host Tracker Table) \\
+17 & \texttt{ct\_srv\_src} & Connections to same service from src. & Userspace Engine (Host Tracker Table) \\
+18 & \texttt{proto\_tcp} & Protocol TCP indicator & IP Header (Protocol Field, One-Hot) \\
+19 & \texttt{swin} & Source TCP advertised window size & Ingress XDP (TCP Header) \\
+20 & \texttt{dwin} & Destination TCP advertised window size & Reverse Flow Tracker (TCP Header) \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
+
+\textit{Operational Boundary Note:} Direct packet header attributes (\texttt{sttl}, \texttt{dttl}, \texttt{dsport}, \texttt{swin}, \texttt{dwin}, \texttt{proto\_tcp}, \texttt{proto\_unas}, \texttt{state\_INT}, \texttt{state\_CON}) are inspectable at ingress line rate within network driver hooks. Rate dynamics and timing deltas (\texttt{Sload}, \texttt{Dload}, \texttt{dmeansz}, \texttt{tcprtt}, \texttt{synack}, \texttt{ackdat}) are tracked in kernel flow tables across active session durations. Crucially, the five multi-flow window attributes in the \texttt{ct\_*} family (features 2, 4, 10, 16, and 17) capture historical host-to-host and service connection frequencies aggregated across 100-connection windows; they are maintained in host tracking hash tables by the userspace aggregation engine and are \textit{not} collected by the lightweight single-packet in-kernel XDP filter (\texttt{spectre\_xdp.c}). This distinction delineates the offline benchmark feature set (\texttt{ebpf\_compatible}, Modality A) from the strict in-kernel extraction sensor (\texttt{ebpf\_sensor\_strict}, Modality B).
 
 \begin{table*}[t]
 \caption{Multi-Seed Validation Performance Across Architectural Variants on Active Horizon ($\Delta t = 30\text{ s}$, Seeds $\{42, 123, 1337\}$)}
@@ -240,8 +254,8 @@ The empirical results demonstrate several key findings:
 \subsection{Cross-Hardware Determinism and Ranking Invariance}
 Identical model training was executed across two distinct physical environments:
 \begin{enumerate}
-    \item \textbf{Node G15:} NVIDIA GeForce RTX 3050 Laptop GPU (6\,GB vRAM, Ampere GA107, CUDA 12.6, PyTorch 2.11.0).
-    \item \textbf{Node Colab Pro:} NVIDIA Tesla T4 (15\,GB vRAM, Turing TU104, CUDA 13.0, PyTorch 2.11.0).
+    \item \textbf{Node G15:} NVIDIA GeForce RTX 3050 Laptop GPU (6\,GB vRAM, Ampere GA107, CUDA 12.6, PyTorch 2.11.0, PyTorch Geometric 2.8.1).
+    \item \textbf{Node Colab Pro:} NVIDIA Tesla T4 (15\,GB vRAM, Turing TU104, CUDA 13.0, PyTorch 2.11.0, PyTorch Geometric 2.8.1).
 \end{enumerate}
 
 Due to non-deterministic atomic reductions (\texttt{atomicAdd}) in parallel CUDA graph scatter kernels, minor numerical variations occurred across microarchitectures ($\Delta F_1 \approx \pm 0.009$). However, the architectural ranking remained strictly invariant across both platforms:
@@ -315,7 +329,7 @@ These findings indicate that relational spatial topology provides structural reg
 \section{Empirical Latency and Operational Feasibility}
 
 \subsection{Latency Benchmarking on Consumer Hardware}
-To evaluate operational feasibility, we benchmarked the execution latency of SPECTRE-GRID on an Intel Core i7-13700H host equipped with an NVIDIA GeForce RTX 3050 Laptop GPU (6\,GB vRAM) running CUDA 12.6 and PyTorch Geometric 2.11.0. Stage-by-stage latencies were recorded over $30$ measured passes following $10$ warmup iterations on the 48-snapshot validation set ($1{,}793$ nodes).
+To evaluate operational feasibility, we benchmarked the execution latency of SPECTRE-GRID on an Intel Core i7-13700H host equipped with an NVIDIA GeForce RTX 3050 Laptop GPU (6\,GB vRAM) running CUDA 12.6, PyTorch 2.11.0, and PyTorch Geometric 2.8.1. Stage-by-stage latencies were recorded over $30$ measured passes following $10$ warmup iterations on the 48-snapshot validation set ($1{,}793$ nodes).
 
 As shown in Fig.~\ref{fig:latency}, the latency characteristics are:
 \begin{itemize}

@@ -148,11 +148,11 @@ Ambos os ambientes executaram o mesmo código da branch `fix/leakage-free-pipeli
 | Variante Arquitetural | Nós Benignos Avaliados | Falsos Positivos ($FP$) | Verdadeiros Negativos ($TN$) | FPR Operacional na Cauda Benigna (%) |
 | :--- | :---: | :---: | :---: | :---: |
 | `cnn_lstm_pure` | 15.900 | 7 | 15.893 | **0,044%** |
-| `gat_self_loop` | 15.900 | 0 | 15.900 | **0,000%** |
+| `gat_self_loop` | 15.900 | 24 | 15.876 | **0,151%** |
 | `cnn_lstm_gat` | 15.900 | 34 | 15.866 | **0,214%** |
-| `gat_reverse` | 15.900 | 142 | 15.758 | **0,893%** |
-| **`gat_bidir`** | 15.900 | 83 | 15.817 | **0,522%** |
-| **`gat_residual`** | 15.900 | 97 | 15.803 | **0,610%** |
+| `gat_reverse` | 15.900 | 0 | 15.900 | **0,000%** |
+| **`gat_bidir`** | 15.900 | 91 | 15.809 | **0,572%** |
+| **`gat_residual`** | 15.900 | 142 | 15.758 | **0,893%** |
 
 ---
 
