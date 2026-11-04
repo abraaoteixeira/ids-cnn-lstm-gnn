@@ -418,6 +418,8 @@ def test_pure_cnn_lstm_variant_and_val_only_mode():
         assert res["model_variant"] == "cnn_lstm_pure"
         assert res["val_only"] is True
         assert res["test_held_out"] is None, "Modo val_only=True não pode retornar métricas do teste reservado!"
+        state = torch.load(ckpt, map_location="cpu", weights_only=True)
+        assert all(not k.startswith("gat.") for k in state.keys()), "Modelo cnn_lstm_pure não deve conter parâmetros GATConv!"
 
 
 def test_external_frozen_transform_and_experimental_variants_and_latency_module():
@@ -497,7 +499,5 @@ def test_external_frozen_transform_and_experimental_variants_and_latency_module(
         assert "p99" in bench["per_snapshot_streaming_latency"]["pure_neural_inference_ms_per_snapshot"]
         assert bench["latency_scope_separation"]["end_to_end_wan_mitigation_latency_measured"] is False
 
-        state = torch.load(ckpt, map_location="cpu", weights_only=True)
-        assert all(not k.startswith("gat.") for k in state.keys()), "Modelo cnn_lstm_pure não deve conter parâmetros GATConv!"
 
 
