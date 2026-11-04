@@ -1,0 +1,126 @@
+{
+  "csv_path": "data\\raw\\benchmarks\\UNSW-NB15.csv",
+  "dataset_sha256": "7d851bbeabd27894ce39c8e78835c73341fc946652fb7743b9eff193b55eb511",
+  "total_rows": 700001,
+  "total_attacks": 22215,
+  "t_min_epoch": 1421927377.0,
+  "t_max_epoch": 1421955842.0,
+  "total_span_sec": 28465.0,
+  "first_attack_row_after_sort": 13,
+  "last_attack_row_after_sort": 186807,
+  "active_attack_horizon_rows": 200000,
+  "post_campaign_benign_tail_rows": 500001,
+  "post_campaign_benign_tail_attacks": 0,
+  "time_gaps_gt_60s": 1,
+  "max_time_gap_sec": 859.0,
+  "deciles": [
+    {
+      "decile": 0,
+      "start_row": 0,
+      "end_row": 70000,
+      "rows": 70000,
+      "t_min": 1421927377.0,
+      "t_max": 1421930202.0,
+      "attacks": 4948,
+      "attack_rate": 0.070686
+    },
+    {
+      "decile": 1,
+      "start_row": 70000,
+      "end_row": 140000,
+      "rows": 70000,
+      "t_min": 1421930202.0,
+      "t_max": 1421932604.0,
+      "attacks": 12510,
+      "attack_rate": 0.178714
+    },
+    {
+      "decile": 2,
+      "start_row": 140000,
+      "end_row": 210000,
+      "rows": 70000,
+      "t_min": 1421932604.0,
+      "t_max": 1421935434.0,
+      "attacks": 4757,
+      "attack_rate": 0.067957
+    },
+    {
+      "decile": 3,
+      "start_row": 210000,
+      "end_row": 280000,
+      "rows": 70000,
+      "t_min": 1421935434.0,
+      "t_max": 1421938628.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    },
+    {
+      "decile": 4,
+      "start_row": 280000,
+      "end_row": 350000,
+      "rows": 70000,
+      "t_min": 1421938628.0,
+      "t_max": 1421941918.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    },
+    {
+      "decile": 5,
+      "start_row": 350000,
+      "end_row": 420000,
+      "rows": 70000,
+      "t_min": 1421941918.0,
+      "t_max": 1421944901.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    },
+    {
+      "decile": 6,
+      "start_row": 420000,
+      "end_row": 490000,
+      "rows": 70000,
+      "t_min": 1421944901.0,
+      "t_max": 1421945701.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    },
+    {
+      "decile": 7,
+      "start_row": 490000,
+      "end_row": 560000,
+      "rows": 70000,
+      "t_min": 1421945701.0,
+      "t_max": 1421948806.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    },
+    {
+      "decile": 8,
+      "start_row": 560000,
+      "end_row": 630000,
+      "rows": 70000,
+      "t_min": 1421948806.0,
+      "t_max": 1421951961.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    },
+    {
+      "decile": 9,
+      "start_row": 630000,
+      "end_row": 700001,
+      "rows": 70001,
+      "t_min": 1421951961.0,
+      "t_max": 1421955842.0,
+      "attacks": 0,
+      "attack_rate": 0.0
+    }
+  ],
+  "available_csv_files": [
+    "data\\raw\\dummy_traffic.csv",
+    "data\\raw\\KDDTrain_compat.csv",
+    "data\\raw\\benchmarks\\Tuesday-WorkingHours.pcap_ISCX.csv",
+    "data\\raw\\benchmarks\\UNSW-NB15.csv",
+    "data\\raw\\benchmarks\\Wednesday-workingHours.pcap_ISCX.csv"
+  ],
+  "unsw_nb15_2_present_locally": false
+}

@@ -1,0 +1,183 @@
+{
+  "git_commit": "8b41836",
+  "dataset_sha256": "7d851bbeabd27894ce39c8e78835c73341fc946652fb7743b9eff193b55eb511",
+  "modality": "Modality_A_offline_ebpf_compatible",
+  "feature_scope": "ebpf_compatible",
+  "window_sec": 30.0,
+  "model_variant": "gat_self_loop",
+  "seed": 1337,
+  "epochs": 30,
+  "batch_size": 8,
+  "best_epoch": 7,
+  "validation_metrics": {
+    "accuracy": 0.930284,
+    "precision": 0.616725,
+    "recall": 0.921875,
+    "f1_score": 0.73904,
+    "fpr": 0.068707,
+    "confusion_matrix": {
+      "tn": 1491,
+      "fp": 110,
+      "fn": 15,
+      "tp": 177
+    }
+  },
+  "validation_node_group_metrics": {
+    "cross_host_edges_by_label": {
+      "0_to_0": 4918,
+      "1_to_0": 1042,
+      "0_to_1": 49,
+      "1_to_1": 0
+    },
+    "benign_targeted_by_attacker": {
+      "total": 461,
+      "fp": 110,
+      "tn": 351,
+      "fpr": 0.238612
+    },
+    "benign_untargeted": {
+      "total": 1140,
+      "fp": 0,
+      "tn": 1140,
+      "fpr": 0.0
+    }
+  },
+  "epoch_history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.025306,
+      "val_loss": 0.625358,
+      "val_precision": 0.394628,
+      "val_recall": 0.994792,
+      "val_f1": 0.565089,
+      "val_fpr": 0.183011
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.499459,
+      "val_loss": 0.389609,
+      "val_precision": 0.448441,
+      "val_recall": 0.973958,
+      "val_f1": 0.614122,
+      "val_fpr": 0.14366
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.450055,
+      "val_loss": 0.346634,
+      "val_precision": 0.506739,
+      "val_recall": 0.979167,
+      "val_f1": 0.667851,
+      "val_fpr": 0.114304
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.42603,
+      "val_loss": 0.338116,
+      "val_precision": 0.534483,
+      "val_recall": 0.96875,
+      "val_f1": 0.688889,
+      "val_fpr": 0.101187
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.417738,
+      "val_loss": 0.333614,
+      "val_precision": 0.537572,
+      "val_recall": 0.96875,
+      "val_f1": 0.69145,
+      "val_fpr": 0.099938
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.395358,
+      "val_loss": 0.344464,
+      "val_precision": 0.57508,
+      "val_recall": 0.9375,
+      "val_f1": 0.712871,
+      "val_fpr": 0.083073
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.376745,
+      "val_loss": 0.366699,
+      "val_precision": 0.616725,
+      "val_recall": 0.921875,
+      "val_f1": 0.73904,
+      "val_fpr": 0.068707
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.362182,
+      "val_loss": 0.321187,
+      "val_precision": 0.526912,
+      "val_recall": 0.96875,
+      "val_f1": 0.682569,
+      "val_fpr": 0.10431
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.371166,
+      "val_loss": 0.331857,
+      "val_precision": 0.536023,
+      "val_recall": 0.96875,
+      "val_f1": 0.690167,
+      "val_fpr": 0.100562
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.345669,
+      "val_loss": 0.389337,
+      "val_precision": 0.619403,
+      "val_recall": 0.864583,
+      "val_f1": 0.721739,
+      "val_fpr": 0.06371
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.357872,
+      "val_loss": 0.303172,
+      "val_precision": 0.589577,
+      "val_recall": 0.942708,
+      "val_f1": 0.725451,
+      "val_fpr": 0.078701
+    },
+    {
+      "epoch": 12,
+      "train_loss": 0.335445,
+      "val_loss": 0.322883,
+      "val_precision": 0.578275,
+      "val_recall": 0.942708,
+      "val_f1": 0.716832,
+      "val_fpr": 0.082448
+    },
+    {
+      "epoch": 13,
+      "train_loss": 0.322922,
+      "val_loss": 0.317263,
+      "val_precision": 0.564815,
+      "val_recall": 0.953125,
+      "val_f1": 0.709302,
+      "val_fpr": 0.08807
+    },
+    {
+      "epoch": 14,
+      "train_loss": 0.325157,
+      "val_loss": 0.30337,
+      "val_precision": 0.575,
+      "val_recall": 0.958333,
+      "val_f1": 0.71875,
+      "val_fpr": 0.084947
+    }
+  ],
+  "validation_latency": {
+    "total_eval_ms": 62.451,
+    "ms_per_snapshot": 1.3011,
+    "us_per_node": 34.8305
+  },
+  "held_out_test_metrics": null,
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+  "torch_version": "2.11.0+cu126",
+  "training_wall_time_sec": 6.9435
+}

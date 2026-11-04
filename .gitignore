@@ -63,3 +63,7 @@ gcp_credentials*.json
 *nit*draft*
 *patente*
 *formulario_nit*
+
+# === Datasets Brutos e Compactados (proibido enviar ao GitHub) ===
+*.csv
+*.gz

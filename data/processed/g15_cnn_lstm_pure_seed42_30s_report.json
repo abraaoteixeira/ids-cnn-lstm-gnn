@@ -1,0 +1,174 @@
+{
+  "git_commit": "8b41836",
+  "dataset_sha256": "7d851bbeabd27894ce39c8e78835c73341fc946652fb7743b9eff193b55eb511",
+  "modality": "Modality_A_offline_ebpf_compatible",
+  "feature_scope": "ebpf_compatible",
+  "window_sec": 30.0,
+  "model_variant": "cnn_lstm_pure",
+  "seed": 42,
+  "epochs": 30,
+  "batch_size": 8,
+  "best_epoch": 6,
+  "validation_metrics": {
+    "accuracy": 0.936419,
+    "precision": 0.643382,
+    "recall": 0.911458,
+    "f1_score": 0.75431,
+    "fpr": 0.060587,
+    "confusion_matrix": {
+      "tn": 1504,
+      "fp": 97,
+      "fn": 17,
+      "tp": 175
+    }
+  },
+  "validation_node_group_metrics": {
+    "cross_host_edges_by_label": {
+      "0_to_0": 4918,
+      "1_to_0": 1042,
+      "0_to_1": 49,
+      "1_to_1": 0
+    },
+    "benign_targeted_by_attacker": {
+      "total": 461,
+      "fp": 97,
+      "tn": 364,
+      "fpr": 0.210412
+    },
+    "benign_untargeted": {
+      "total": 1140,
+      "fp": 0,
+      "tn": 1140,
+      "fpr": 0.0
+    }
+  },
+  "epoch_history": [
+    {
+      "epoch": 1,
+      "train_loss": 1.046697,
+      "val_loss": 0.741357,
+      "val_precision": 0.345946,
+      "val_recall": 1.0,
+      "val_f1": 0.514056,
+      "val_fpr": 0.226733
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.502145,
+      "val_loss": 0.376605,
+      "val_precision": 0.473418,
+      "val_recall": 0.973958,
+      "val_f1": 0.637138,
+      "val_fpr": 0.129919
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.425942,
+      "val_loss": 0.349134,
+      "val_precision": 0.527221,
+      "val_recall": 0.958333,
+      "val_f1": 0.680222,
+      "val_fpr": 0.103061
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.391007,
+      "val_loss": 0.33895,
+      "val_precision": 0.561129,
+      "val_recall": 0.932292,
+      "val_f1": 0.700587,
+      "val_fpr": 0.087445
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.37377,
+      "val_loss": 0.354562,
+      "val_precision": 0.622776,
+      "val_recall": 0.911458,
+      "val_f1": 0.739958,
+      "val_fpr": 0.066209
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.362347,
+      "val_loss": 0.357977,
+      "val_precision": 0.643382,
+      "val_recall": 0.911458,
+      "val_f1": 0.75431,
+      "val_fpr": 0.060587
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.351306,
+      "val_loss": 0.318794,
+      "val_precision": 0.572327,
+      "val_recall": 0.947917,
+      "val_f1": 0.713725,
+      "val_fpr": 0.084947
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.344821,
+      "val_loss": 0.318705,
+      "val_precision": 0.582524,
+      "val_recall": 0.9375,
+      "val_f1": 0.718563,
+      "val_fpr": 0.080575
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.345338,
+      "val_loss": 0.321781,
+      "val_precision": 0.58147,
+      "val_recall": 0.947917,
+      "val_f1": 0.720792,
+      "val_fpr": 0.081824
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.339616,
+      "val_loss": 0.315628,
+      "val_precision": 0.564669,
+      "val_recall": 0.932292,
+      "val_f1": 0.70334,
+      "val_fpr": 0.086196
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.323725,
+      "val_loss": 0.358401,
+      "val_precision": 0.606272,
+      "val_recall": 0.90625,
+      "val_f1": 0.726514,
+      "val_fpr": 0.070581
+    },
+    {
+      "epoch": 12,
+      "train_loss": 0.313996,
+      "val_loss": 0.35445,
+      "val_precision": 0.610526,
+      "val_recall": 0.90625,
+      "val_f1": 0.72956,
+      "val_fpr": 0.069332
+    },
+    {
+      "epoch": 13,
+      "train_loss": 0.303076,
+      "val_loss": 0.354545,
+      "val_precision": 0.6,
+      "val_recall": 0.90625,
+      "val_f1": 0.721992,
+      "val_fpr": 0.072455
+    }
+  ],
+  "validation_latency": {
+    "total_eval_ms": 21.9114,
+    "ms_per_snapshot": 0.4565,
+    "us_per_node": 12.2205
+  },
+  "held_out_test_metrics": null,
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+  "torch_version": "2.11.0+cu126",
+  "training_wall_time_sec": 5.2249
+}

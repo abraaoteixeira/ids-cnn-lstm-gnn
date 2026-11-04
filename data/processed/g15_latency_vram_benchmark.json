@@ -1,0 +1,446 @@
+{
+  "cnn_lstm_pure": {
+    "split_evaluated_num_snapshots": 48,
+    "split_evaluated_total_nodes": 1793,
+    "batch_size": 8,
+    "warmup_runs": 10,
+    "measured_runs": 30,
+    "vram_usage": {
+      "allocated_mib": 41.611,
+      "reserved_mib": 72.0,
+      "peak_allocated_mib": 66.47
+    },
+    "stage_breakdown_per_full_pass_ms": {
+      "batch_preparation_cpu_ms": {
+        "mean": 9.7391,
+        "std": 2.79,
+        "min": 5.7796,
+        "p50": 11.3861,
+        "p95": 12.554,
+        "p99": 13.4358,
+        "max": 13.722
+      },
+      "cpu_to_gpu_transfer_ms": {
+        "mean": 4.1347,
+        "std": 1.2447,
+        "min": 2.524,
+        "p50": 4.2758,
+        "p95": 4.9055,
+        "p99": 8.1811,
+        "max": 9.5106
+      },
+      "pure_gpu_neural_inference_ms": {
+        "mean": 14.3,
+        "std": 2.0312,
+        "min": 11.0372,
+        "p50": 15.0196,
+        "p95": 16.9104,
+        "p99": 18.9007,
+        "max": 19.3436
+      },
+      "postprocess_and_gpu_to_cpu_ms": {
+        "mean": 1.8985,
+        "std": 0.361,
+        "min": 1.2614,
+        "p50": 2.0841,
+        "p95": 2.2771,
+        "p99": 2.3274,
+        "max": 2.3325
+      },
+      "total_classification_pipeline_ms": {
+        "mean": 30.3234,
+        "std": 5.8865,
+        "min": 20.8024,
+        "p50": 33.6684,
+        "p95": 37.644,
+        "p99": 38.3184,
+        "max": 38.4376
+      }
+    },
+    "per_snapshot_streaming_latency": {
+      "pure_neural_inference_ms_per_snapshot": {
+        "mean": 3.1447,
+        "std": 2.0931,
+        "min": 2.1516,
+        "p50": 2.2286,
+        "p95": 8.2343,
+        "p99": 8.4426,
+        "max": 8.4638
+      },
+      "classification_pipeline_ms_per_snapshot": {
+        "mean": 3.8276,
+        "std": 2.1072,
+        "min": 2.7691,
+        "p50": 2.9405,
+        "p95": 8.944,
+        "p99": 9.1302,
+        "max": 9.1305
+      }
+    },
+    "per_node_streaming_latency": {
+      "pure_neural_inference_us_per_node": {
+        "mean": 84.5918,
+        "std": 57.34,
+        "min": 55.8846,
+        "p50": 61.1658,
+        "p95": 228.0871,
+        "p99": 239.1462,
+        "max": 242.7294
+      },
+      "classification_pipeline_us_per_node": {
+        "mean": 102.8856,
+        "std": 57.7997,
+        "min": 71.7282,
+        "p50": 79.1842,
+        "p95": 246.8684,
+        "p99": 258.681,
+        "max": 263.1647
+      }
+    },
+    "throughput": {
+      "pure_inference_snapshots_per_sec": 3356.63,
+      "pure_inference_nodes_per_sec": 125384.26,
+      "full_pipeline_snapshots_per_sec": 1582.94,
+      "full_pipeline_nodes_per_sec": 59129.27
+    },
+    "latency_scope_separation": {
+      "neural_inference_latency_measured": true,
+      "local_classification_pipeline_latency_measured": true,
+      "end_to_end_wan_mitigation_latency_measured": false,
+      "note": "Os tempos acima referem-se exclusivamente ao pipeline local de preparação de grafos, transferência CPU->GPU e inferência neural. Não incluem latência de propagação de rede WAN nem o tempo de atualização de mapas BPF no kernel Linux."
+    }
+  },
+  "gat_self_loop": {
+    "split_evaluated_num_snapshots": 48,
+    "split_evaluated_total_nodes": 1793,
+    "batch_size": 8,
+    "warmup_runs": 10,
+    "measured_runs": 30,
+    "vram_usage": {
+      "allocated_mib": 41.77,
+      "reserved_mib": 72.0,
+      "peak_allocated_mib": 66.629
+    },
+    "stage_breakdown_per_full_pass_ms": {
+      "batch_preparation_cpu_ms": {
+        "mean": 12.0107,
+        "std": 0.6236,
+        "min": 11.3883,
+        "p50": 11.7566,
+        "p95": 13.4668,
+        "p99": 13.8511,
+        "max": 13.9329
+      },
+      "cpu_to_gpu_transfer_ms": {
+        "mean": 5.2737,
+        "std": 0.5488,
+        "min": 4.4776,
+        "p50": 5.0793,
+        "p95": 6.3223,
+        "p99": 6.4825,
+        "max": 6.5262
+      },
+      "pure_gpu_neural_inference_ms": {
+        "mean": 38.7712,
+        "std": 2.8686,
+        "min": 34.43,
+        "p50": 37.8636,
+        "p95": 44.7135,
+        "p99": 48.3241,
+        "max": 48.6499
+      },
+      "postprocess_and_gpu_to_cpu_ms": {
+        "mean": 2.3129,
+        "std": 0.4629,
+        "min": 2.0397,
+        "p50": 2.1823,
+        "p95": 2.637,
+        "p99": 4.0821,
+        "max": 4.6359
+      },
+      "total_classification_pipeline_ms": {
+        "mean": 58.7185,
+        "std": 4.0057,
+        "min": 53.0764,
+        "p50": 57.6539,
+        "p95": 67.3948,
+        "p99": 72.4986,
+        "max": 72.8836
+      }
+    },
+    "per_snapshot_streaming_latency": {
+      "pure_neural_inference_ms_per_snapshot": {
+        "mean": 5.1039,
+        "std": 0.2131,
+        "min": 4.8733,
+        "p50": 5.0528,
+        "p95": 5.4075,
+        "p99": 5.8899,
+        "max": 5.9202
+      },
+      "classification_pipeline_ms_per_snapshot": {
+        "mean": 5.7777,
+        "std": 0.2185,
+        "min": 5.5132,
+        "p50": 5.7248,
+        "p95": 6.1471,
+        "p99": 6.5846,
+        "max": 6.594
+      }
+    },
+    "per_node_streaming_latency": {
+      "pure_neural_inference_us_per_node": {
+        "mean": 136.895,
+        "std": 8.886,
+        "min": 122.6325,
+        "p50": 134.5568,
+        "p95": 153.2847,
+        "p99": 164.7166,
+        "max": 174.1235
+      },
+      "classification_pipeline_us_per_node": {
+        "mean": 154.963,
+        "std": 9.5396,
+        "min": 138.555,
+        "p50": 152.651,
+        "p95": 172.8153,
+        "p99": 184.036,
+        "max": 193.3559
+      }
+    },
+    "throughput": {
+      "pure_inference_snapshots_per_sec": 1238.03,
+      "pure_inference_nodes_per_sec": 46245.73,
+      "full_pipeline_snapshots_per_sec": 817.46,
+      "full_pipeline_nodes_per_sec": 30535.5
+    },
+    "latency_scope_separation": {
+      "neural_inference_latency_measured": true,
+      "local_classification_pipeline_latency_measured": true,
+      "end_to_end_wan_mitigation_latency_measured": false,
+      "note": "Os tempos acima referem-se exclusivamente ao pipeline local de preparação de grafos, transferência CPU->GPU e inferência neural. Não incluem latência de propagação de rede WAN nem o tempo de atualização de mapas BPF no kernel Linux."
+    }
+  },
+  "cnn_lstm_gat": {
+    "split_evaluated_num_snapshots": 48,
+    "split_evaluated_total_nodes": 1793,
+    "batch_size": 8,
+    "warmup_runs": 10,
+    "measured_runs": 30,
+    "vram_usage": {
+      "allocated_mib": 40.951,
+      "reserved_mib": 72.0,
+      "peak_allocated_mib": 65.285
+    },
+    "stage_breakdown_per_full_pass_ms": {
+      "batch_preparation_cpu_ms": {
+        "mean": 17.9416,
+        "std": 3.3028,
+        "min": 9.8221,
+        "p50": 17.935,
+        "p95": 22.4079,
+        "p99": 26.3989,
+        "max": 27.9104
+      },
+      "cpu_to_gpu_transfer_ms": {
+        "mean": 8.1803,
+        "std": 0.9161,
+        "min": 5.8947,
+        "p50": 8.0508,
+        "p95": 9.0373,
+        "p99": 10.6332,
+        "max": 11.271
+      },
+      "pure_gpu_neural_inference_ms": {
+        "mean": 39.8388,
+        "std": 4.2243,
+        "min": 31.7058,
+        "p50": 38.8086,
+        "p95": 47.6802,
+        "p99": 52.178,
+        "max": 53.7884
+      },
+      "postprocess_and_gpu_to_cpu_ms": {
+        "mean": 2.2988,
+        "std": 0.6197,
+        "min": 1.5136,
+        "p50": 2.1715,
+        "p95": 2.6258,
+        "p99": 4.6467,
+        "max": 5.4672
+      },
+      "total_classification_pipeline_ms": {
+        "mean": 68.6459,
+        "std": 7.5824,
+        "min": 49.0842,
+        "p50": 67.5494,
+        "p95": 82.1,
+        "p99": 87.7475,
+        "max": 89.2536
+      }
+    },
+    "per_snapshot_streaming_latency": {
+      "pure_neural_inference_ms_per_snapshot": {
+        "mean": 5.3012,
+        "std": 0.7442,
+        "min": 4.9464,
+        "p50": 5.1639,
+        "p95": 5.5347,
+        "p99": 8.0712,
+        "max": 10.2895
+      },
+      "classification_pipeline_ms_per_snapshot": {
+        "mean": 6.4742,
+        "std": 0.7593,
+        "min": 6.0609,
+        "p50": 6.3255,
+        "p95": 6.7786,
+        "p99": 9.3576,
+        "max": 11.5032
+      }
+    },
+    "per_node_streaming_latency": {
+      "pure_neural_inference_us_per_node": {
+        "mean": 142.04,
+        "std": 19.2796,
+        "min": 129.605,
+        "p50": 137.8844,
+        "p95": 156.5457,
+        "p99": 216.8246,
+        "max": 263.8333
+      },
+      "classification_pipeline_us_per_node": {
+        "mean": 173.49,
+        "std": 19.9454,
+        "min": 158.3333,
+        "p50": 169.9394,
+        "p95": 189.1919,
+        "p99": 252.2332,
+        "max": 294.9538
+      }
+    },
+    "throughput": {
+      "pure_inference_snapshots_per_sec": 1204.86,
+      "pure_inference_nodes_per_sec": 45006.4,
+      "full_pipeline_snapshots_per_sec": 699.24,
+      "full_pipeline_nodes_per_sec": 26119.54
+    },
+    "latency_scope_separation": {
+      "neural_inference_latency_measured": true,
+      "local_classification_pipeline_latency_measured": true,
+      "end_to_end_wan_mitigation_latency_measured": false,
+      "note": "Os tempos acima referem-se exclusivamente ao pipeline local de preparação de grafos, transferência CPU->GPU e inferência neural. Não incluem latência de propagação de rede WAN nem o tempo de atualização de mapas BPF no kernel Linux."
+    }
+  },
+  "gat_residual": {
+    "split_evaluated_num_snapshots": 48,
+    "split_evaluated_total_nodes": 1793,
+    "batch_size": 8,
+    "warmup_runs": 10,
+    "measured_runs": 30,
+    "vram_usage": {
+      "allocated_mib": 41.015,
+      "reserved_mib": 72.0,
+      "peak_allocated_mib": 65.348
+    },
+    "stage_breakdown_per_full_pass_ms": {
+      "batch_preparation_cpu_ms": {
+        "mean": 18.208,
+        "std": 1.0103,
+        "min": 17.5124,
+        "p50": 17.9943,
+        "p95": 19.6378,
+        "p99": 22.1869,
+        "max": 22.8696
+      },
+      "cpu_to_gpu_transfer_ms": {
+        "mean": 8.1453,
+        "std": 0.9182,
+        "min": 7.1151,
+        "p50": 7.9369,
+        "p95": 9.6543,
+        "p99": 11.5021,
+        "max": 11.8932
+      },
+      "pure_gpu_neural_inference_ms": {
+        "mean": 39.9427,
+        "std": 1.6064,
+        "min": 38.3762,
+        "p50": 39.4837,
+        "p95": 42.3885,
+        "p99": 45.8253,
+        "max": 47.1245
+      },
+      "postprocess_and_gpu_to_cpu_ms": {
+        "mean": 2.1927,
+        "std": 0.111,
+        "min": 2.0351,
+        "p50": 2.1713,
+        "p95": 2.3616,
+        "p99": 2.5112,
+        "max": 2.5682
+      },
+      "total_classification_pipeline_ms": {
+        "mean": 68.808,
+        "std": 2.9913,
+        "min": 66.5326,
+        "p50": 68.0412,
+        "p95": 73.5422,
+        "p99": 79.9112,
+        "max": 82.3272
+      }
+    },
+    "per_snapshot_streaming_latency": {
+      "pure_neural_inference_ms_per_snapshot": {
+        "mean": 5.419,
+        "std": 0.3065,
+        "min": 5.1579,
+        "p50": 5.3767,
+        "p95": 5.685,
+        "p99": 6.5476,
+        "max": 7.2437
+      },
+      "classification_pipeline_ms_per_snapshot": {
+        "mean": 6.5686,
+        "std": 0.3093,
+        "min": 6.3006,
+        "p50": 6.5057,
+        "p95": 6.8819,
+        "p99": 7.6681,
+        "max": 8.3507
+      }
+    },
+    "per_node_streaming_latency": {
+      "pure_neural_inference_us_per_node": {
+        "mean": 145.287,
+        "std": 9.8614,
+        "min": 134.9275,
+        "p50": 142.2055,
+        "p95": 159.4025,
+        "p99": 179.8731,
+        "max": 190.6237
+      },
+      "classification_pipeline_us_per_node": {
+        "mean": 176.0919,
+        "std": 10.3733,
+        "min": 163.505,
+        "p50": 172.6263,
+        "p95": 192.0098,
+        "p99": 210.9306,
+        "max": 219.7553
+      }
+    },
+    "throughput": {
+      "pure_inference_snapshots_per_sec": 1201.72,
+      "pure_inference_nodes_per_sec": 44889.25,
+      "full_pipeline_snapshots_per_sec": 697.59,
+      "full_pipeline_nodes_per_sec": 26058.0
+    },
+    "latency_scope_separation": {
+      "neural_inference_latency_measured": true,
+      "local_classification_pipeline_latency_measured": true,
+      "end_to_end_wan_mitigation_latency_measured": false,
+      "note": "Os tempos acima referem-se exclusivamente ao pipeline local de preparação de grafos, transferência CPU->GPU e inferência neural. Não incluem latência de propagação de rede WAN nem o tempo de atualização de mapas BPF no kernel Linux."
+    }
+  }
+}

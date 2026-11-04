@@ -1,0 +1,22 @@
+[
+  "sttl",
+  "proto_unas",
+  "Sload",
+  "ebpf_log1p_spkts",
+  "dsport",
+  "ebpf_log1p_sbytes",
+  "proto_tcp",
+  "swin",
+  "sport",
+  "Sjit",
+  "Spkts",
+  "proto_sctp",
+  "proto_any",
+  "smeansz",
+  "proto_sep",
+  "proto_pim",
+  "proto_rsvp",
+  "proto_swipe",
+  "proto_sun-nd",
+  "proto_mobile"
+]

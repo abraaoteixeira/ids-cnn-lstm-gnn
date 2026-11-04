@@ -1,0 +1,22 @@
+[
+  "sttl",
+  "ct_state_ttl",
+  "state_INT",
+  "ct_dst_sport_ltm",
+  "dttl",
+  "tcprtt",
+  "ackdat",
+  "proto_unas",
+  "synack",
+  "ct_src_dport_ltm",
+  "Sload",
+  "dmeansz",
+  "Dload",
+  "state_CON",
+  "dsport",
+  "ct_dst_src_ltm",
+  "ct_srv_src",
+  "proto_tcp",
+  "swin",
+  "dwin"
+]

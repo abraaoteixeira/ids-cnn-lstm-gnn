@@ -1,0 +1,152 @@
+{
+  "cnn_lstm_pure": {
+    "external_rows": 500001,
+    "num_snapshots": 667,
+    "total_benign_nodes": 15900,
+    "total_attack_nodes": 0,
+    "refitted_on_external": false,
+    "metrics": {
+      "accuracy": 0.99956,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "fpr": 0.00044,
+      "confusion_matrix": {
+        "tn": 15893,
+        "fp": 7,
+        "fn": 0,
+        "tp": 0
+      }
+    },
+    "latency": {
+      "total_eval_ms": 678.196,
+      "ms_per_snapshot": 1.0168,
+      "us_per_node": 42.6538
+    }
+  },
+  "gat_self_loop": {
+    "external_rows": 500001,
+    "num_snapshots": 667,
+    "total_benign_nodes": 15900,
+    "total_attack_nodes": 0,
+    "refitted_on_external": false,
+    "metrics": {
+      "accuracy": 0.998491,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "fpr": 0.001509,
+      "confusion_matrix": {
+        "tn": 15876,
+        "fp": 24,
+        "fn": 0,
+        "tp": 0
+      }
+    },
+    "latency": {
+      "total_eval_ms": 850.3258,
+      "ms_per_snapshot": 1.2749,
+      "us_per_node": 53.4796
+    }
+  },
+  "cnn_lstm_gat": {
+    "external_rows": 500001,
+    "num_snapshots": 667,
+    "total_benign_nodes": 15900,
+    "total_attack_nodes": 0,
+    "refitted_on_external": false,
+    "metrics": {
+      "accuracy": 0.997862,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "fpr": 0.002138,
+      "confusion_matrix": {
+        "tn": 15866,
+        "fp": 34,
+        "fn": 0,
+        "tp": 0
+      }
+    },
+    "latency": {
+      "total_eval_ms": 965.4195,
+      "ms_per_snapshot": 1.4474,
+      "us_per_node": 60.7182
+    }
+  },
+  "gat_reverse": {
+    "external_rows": 500001,
+    "num_snapshots": 667,
+    "total_benign_nodes": 15900,
+    "total_attack_nodes": 0,
+    "refitted_on_external": false,
+    "metrics": {
+      "accuracy": 1.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "fpr": 0.0,
+      "confusion_matrix": {
+        "tn": 15900,
+        "fp": 0,
+        "fn": 0,
+        "tp": 0
+      }
+    },
+    "latency": {
+      "total_eval_ms": 842.5725,
+      "ms_per_snapshot": 1.2632,
+      "us_per_node": 52.992
+    }
+  },
+  "gat_bidir": {
+    "external_rows": 500001,
+    "num_snapshots": 667,
+    "total_benign_nodes": 15900,
+    "total_attack_nodes": 0,
+    "refitted_on_external": false,
+    "metrics": {
+      "accuracy": 0.994277,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "fpr": 0.005723,
+      "confusion_matrix": {
+        "tn": 15809,
+        "fp": 91,
+        "fn": 0,
+        "tp": 0
+      }
+    },
+    "latency": {
+      "total_eval_ms": 835.5193,
+      "ms_per_snapshot": 1.2527,
+      "us_per_node": 52.5484
+    }
+  },
+  "gat_residual": {
+    "external_rows": 500001,
+    "num_snapshots": 667,
+    "total_benign_nodes": 15900,
+    "total_attack_nodes": 0,
+    "refitted_on_external": false,
+    "metrics": {
+      "accuracy": 0.991069,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "fpr": 0.008931,
+      "confusion_matrix": {
+        "tn": 15758,
+        "fp": 142,
+        "fn": 0,
+        "tp": 0
+      }
+    },
+    "latency": {
+      "total_eval_ms": 947.107,
+      "ms_per_snapshot": 1.42,
+      "us_per_node": 59.5665
+    }
+  }
+}
