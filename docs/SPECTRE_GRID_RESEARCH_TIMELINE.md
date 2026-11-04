@@ -1,67 +1,71 @@
 # SPECTRE-GRID: Linha do Tempo da Pesquisa, Genealogia Científica e Matriz de Rastreabilidade
 
-> **Classificação de Governança:** Documento Histórico e Científico Permanente (Quality Gate Nível 1)  
-> **Repositório:** `abraaoteixeira/ids-cnn-lstm-gnn` | **Branch:** `fix/leakage-free-pipeline`  
+> **Classificação de Governança:** Documento Histórico e Científico Permanente (Quality Gate Nível 1 — Versão Auditada e Corrigida)  
+> **Repositório:** `abraaoteixeira/ids-cnn-lstm-gnn` | **Branch de Pesquisa:** `fix/leakage-free-pipeline`  
 > **Pesquisador Principal:** Abraão Teixeira da Silva  
 > **Orientador Acadêmico:** Prof. Dr. Jackson Mallmann (IFC Campus Brusque)  
-> **Data de Emissão:** 04 de Novembro de 2026 | **Commit de Referência:** `ffe8736`  
-> **Princípio Central:** *"Nenhuma afirmação científica sem evidência rastreável; nenhuma alteração crítica sem validação; nenhum resultado definitivo sem revisão independente."*
+> **Data de Emissão Original:** 04 de Novembro de 2026 | **Revisão Corretiva:** 04 de Novembro de 2026  
+> **Princípio Metodológico:** *"Nenhuma afirmação científica sem evidência rastreável; nenhuma alteração crítica sem validação; nenhum resultado definitivo sem revisão independente."*
 
 ---
 
-## 1. Introdução e Metodologia da Auditoria Histórica
+## 1. Introdução, Escopo e Metodologia da Auditoria Histórica
 
-Este documento estabelece a reconstituição cronológica, metodológica e ontológica exaustiva do projeto **SPECTRE-GRID** (*Spatio-Temporal eBPF-GNN Network Intrusion Detection and Prevention System*). A investigação cobre toda a trajetória do projeto, desde o primeiro commit no repositório Git em 19 de Maio de 2026 até a finalização do manuscrito científico para a conferência **IEEE/IFIP NOMS 2027** em 04 de Novembro de 2026.
+O presente documento estabelece a reconstrução histórica, metodológica e arquitetural verificável do projeto **SPECTRE-GRID** (*Spatio-Temporal eBPF-GNN Network Intrusion Detection and Prevention System*). 
 
-### 1.1 Metodologia de Coleta de Evidências
-A auditoria utilizou cinco fontes primárias de verificação empírica:
-1. **Histórico Git Integral:** Extração cronológica de 48 commits na branch de pesquisa `fix/leakage-free-pipeline`, verificando autores, mensagens, `git diff` e timestamps exatos.
-2. **Artefatos e Checkpoints em Disco:** Inspeção de pesos neurais serializados (`.pt`, `.pth`), grafos estáticos legados (`network_graph.pt`), bundles temporais congelados (`unsw_full_ebpf_30s.pt`) e arquivos binários de eBPF (`spectre_xdp.o`).
-3. **Relatórios Experimentais JSON Brutos:** Auditoria de métricas com hashes SHA-256 em `data/processed/` (campanhas multi-seed Dell G15 e Colab Pro T4).
-4. **Notebooks Jupyter/Colab:** Rastreamento de células de execução, logs de download de datasets e scripts de retreinamento em nuvem.
-5. **Memória Técnica e Documental:** Análise comparativa entre `SPECTRE_LIVRO_BASE.md` (1.787 linhas, Julho de 2026), relatórios de TCC, `docs/SCIENTIFIC_MEMORY.md` e os relatórios de integridade.
+O propósito desta reconstituição é fornecer um registro técnico factual e auditável para consultas acadêmicas, avaliação pelo orientador Prof. Dr. Jackson Mallmann, fundamentação do Trabalho de Conclusão de Curso (TCC) e embasamento de artigos científicos, eliminando asserções hiperbólicas, estimativas exploratórias não comprovadas e suposições sem respaldo documental.
+
+### 1.1 Metodologia de Coleta e Verificação de Evidências
+A auditoria fundamentou-se em cinco fontes primárias de verificação:
+1. **Histórico Git Auditado:** Rastreamento cronológico de commits na branch `fix/leakage-free-pipeline` e no branch histórico, conferindo mensagens, `git diff`, autores e datas de alteração.
+2. **Diferenciação Estrita de Artefatos Binários:**
+   - **Bundles de Grafos e Snapshots (`.pt`):** Arquivos contendo estruturas de grafos, conectividade e atributos agregados (ex.: `data/processed/unsw_full_ebpf_30s.pt`, serializando instâncias `torch_geometric.data.Data`). Não contêm pesos de modelos neurais.
+   - **Checkpoints de Pesos Neurais (`.pth` / `.pt`):** Dicionários de pesos treinados (`state_dict`) salvos pelo PyTorch durante o treinamento supervisionado (ex.: `g15_*_best.pth` e o legado `best_model.pth`).
+3. **Relatórios Experimentais JSON Brutos:** Auditoria direta de métricas, matrizes de confusão e tempos de inferência em arquivos salvos em `data/processed/`.
+4. **Notebooks Jupyter / Google Colab:** Análise das células de código, dependências e configurações de execução remota em GPU.
+5. **Código-Fonte Executável:** Inspeção direta da arquitetura implementada em `model.py`, do pipeline em `train.py`, do extrator em `preprocessor.py` e do kernel eBPF em `ebpf/spectre_xdp.c`.
 
 ### 1.2 Taxonomia Ontológica de Governança
-Para erradicar conclusões precipitadas e a perpetuação de registros legados desatualizados, toda entidade, dataset ou métrica é classificada em uma das seguintes categorias ontológicas:
+Toda afirmação, conjunto de dados ou componente arquitetural é categorizado segundo os seguintes critérios epistemológicos:
 
 | Categoria Ontológica | Definição Formal | Critério de Aceitação |
 | :--- | :--- | :--- |
-| **`[FATO COMPROVADO]`** | Evidência empírica reproduzível, com código testado, dados brutos auditáveis e métricas convergentes. | Checkpoint existente + Relatório JSON verificado + Teste automatizado verde. |
-| **`[ADAPTAÇÃO EMPÍRICA]`** | Técnica pré-existente na literatura científica adaptada com alterações arquiteturais específicas para o SPECTRE-GRID. | Comparação formal com o estado da arte e testes de ablação dedicados. |
+| **`[FATO COMPROVADO]`** | Evidência empírica reproduzível, com código testado, dados brutos auditáveis e métricas documentadas em relatórios JSON. | Checkpoint existente + Relatório JSON verificado + Teste automatizado verde. |
+| **`[ADAPTAÇÃO EMPÍRICA]`** | Técnica pré-existente na literatura científica adaptada com alterações arquiteturais específicas para o SPECTRE-GRID. | Código no repositório + Citação da literatura + Comparativo experimental. |
 | **`[REGISTRO CORRIGIDO]`** | Informação histórica ou estimativa exploratória preliminar superada por auditoria quantitativa rigorosa. | Nota de conciliação explícita entre valor legado e valor auditado. |
-| **`[PLANEJADO NÃO EXECUTADO]`** | Proposta arquitetural, desenho conceitual ou script de protótipo sem modelo neural treinado correspondente. | Documentado como proposta futura sem geração de pesos neurais. |
+| **`[NÃO COMPROVADO / PENDENTE]`** | Procedimento ou treinamento que pode ter sido executado em ambientes efêmeros (ex.: Colab), mas sem checkpoints ou relatórios retidos no Git. | Registro formal da lacuna de rastreabilidade, sem afirmar categoricamente negação ou confirmação. |
+| **`[PLANEJADO NÃO EXECUTADO]`** | Proposta arquitetural, desenho conceitual ou script de protótipo sem modelo neural treinado correspondente. | Documentado no repositório como proposta futura, sem geração de pesos neurais. |
+| **`[VALOR EXIBIDO NA INTERFACE]`** | Valor numérico exibido em painel visual durante simulações controladas ou testes de desenvolvimento de frontend. | Não comprova descarte físico em kernel nem eficácia do classificador. |
 | **`[HIPÓTESE TEÓRICA]`** | Suposição matemática ou conceitual em fase de validação empírica. | Requer formulação explícita e teste estatístico confirmatório. |
 
 ---
 
-## 2. Linha do Tempo Cronológica Completa (Maio a Novembro de 2026)
-
-A evolução do SPECTRE-GRID divide-se em cinco marcos evolutivos bem delineados:
+## 2. Linha do Tempo Cronológica Completa e Verificada (Maio a Novembro de 2026)
 
 ```mermaid
 timeline
-    title Evolução Cronológica e Arquitetural do SPECTRE-GRID (2026)
+    title Evolução Cronológica do SPECTRE-GRID (2026)
     section Marco 1: Gênese
         19 de Maio : Commit 3914c23 : Criação do model.py (CNN-LSTM-GAT)
-        19 de Maio : Commit 474c9e0 : Ingestão e validação in-memory com KDDTrain+
-        20 de Maio : Commit 589f487 : Substituição de disco por Unix Sockets IPC
+        19 de Maio : Commit 474c9e0 : Validação in-memory com KDDTrain+
+        20 de Maio : Commit 589f487 : IPC Unix Sockets eliminando I/O de disco
         21 de Maio : Commit 05951a2 : Orquestração systemd para WSL2 / Linux
     section Marco 2: NOC/SOC UI
         28 de Maio : Commit 0dd18c7 : Control Plane V2 e Loaders C++/Go/Rust
         29 de Maio : Commits f3477b4 / 9fddfa4 : Dashboard NOC/SOC Enterprise React
         31 de Maio : Commit db1e471 : SPECTRE v1.1 e Ensemble STGNN + Heurística
-        01 de Junho : Commit 4ec7bc4 : Infraestrutura VPS e Documentação de TCC
+        01 de Junho : Commit 4ec7bc4 : Infraestrutura VPS e Memorial de TCC
     section Marco 3: NetFlow & DBVA
         01 de Junho : Commit d2f85fb : Notebook Colab NF-UQ-NIDS-v2
-        12 de Julho : Commit 6296ceb : Adição do SPECTRE_LIVRO_BASE.md (1.787 linhas)
-        15 de Julho : Commit 3726ece : Socket Feeder contínuo para fluxo de dados
+        12 de Julho : Commit 6296ceb : Compilação do SPECTRE_LIVRO_BASE.md
+        15 de Julho : Commit 3726ece : Socket Feeder contínuo de fluxos simulados
     section Marco 4: Kernel eBPF
         14 de Outubro : Commit 5015d63 : Correção de endianness e ringbuf no spectre_xdp.c
         16 de Outubro : Commit 79ed168 : Pipeline v2.0 unificado e CI Codespaces
     section Marco 5: NOMS 2027
         03 de Novembro : Commits 1490df7 / 7255007 : Eliminação de leakage e snapshots G_t (30s)
-        03 de Novembro : Commit 4ab39c0 : Estudo de ablação GAT e heterofilia de vizinhança
-        04 de Novembro : Commit e171cfb : Generalização em UNSW-NB15_2 e auditoria cronológica
+        03 de Novembro : Commit 4ab39c0 : Estudo de ablações GAT (reverse, bidir, residual)
+        04 de Novembro : Commit e171cfb : Generalização em UNSW-NB15_2 (400k..600k)
         04 de Novembro : Commit ffe8736 : Manuscrito IEEEtran e governança definitiva aprovada
 ```
 
@@ -69,229 +73,239 @@ timeline
 
 ### Marco 1: Gênese do SPECTRE-GRID e Arquitetura Inicial (19 a 21 de Maio de 2026)
 - **Commits:** `3914c23` $\to$ `6747966`
-- **Foco Técnico:** Prova de conceito do pipeline híbrido (C++ / eBPF / PyTorch), viabilidade de carregamento in-memory e comunicação interprocessos (IPC).
-- **Eventos Críticos e Decisões:**
-  1. *Criação do Modelo Neural Base (`3914c23`, 19/05/2026):* Implementação em `model.py` da rede `SPECTRE_GRID`, encadeando `Conv1d` $\to$ `LSTM` $\to$ `GATConv` $\to$ `Linear`. O cabeçalho documentou a inspiração em Ananthi et al. (ICICNIS 2024) para a combinação CNN-LSTM, integrando a camada GAT como estrato topológico inovador.
-  2. *Pipeline Pandas In-Memory (`8fc874a` e `474c9e0`, 19/05/2026):* Eliminação de gargalos de leitura em disco para benchmarks clássicos em formato ZIP e validação funcional de ingestão tabular usando o dataset `KDDTrain+.txt`.
-  3. *Eliminação de I/O em Disco via Unix Domain Sockets (`589f487`, 20/05/2026):* Implementação de comunicação direta entre o motor em C++ (`loader_fusion.cpp`) e o motor de inferência Python através de sockets IPC Unix, reduzindo a latência de transferência de milissegundos para microssegundos.
-  4. *Integração de Sistema Linux Enterprise (`05951a2` e `6747966`, 21/05/2026):* Criação de serviços `systemd` (`spectre-fusion.service`, `spectre-api.service`, `spectre-web.service`) e padronização de caminhos no sistema de arquivos nativo do WSL2 para prevenir gargalos do protocolo 9P (`/mnt/c/`).
+- **Foco Técnico:** Prova de conceito de pipeline híbrido, viabilidade de carregamento in-memory e comunicação interprocessos (IPC).
+- **Eventos Críticos e Evidências:**
+  1. *Criação do Modelo Neural Base (`3914c23`, 19/05/2026):* Implementação em `model.py` da classe `SPECTRE_GRID`. O cabeçalho registrou uma referência genérica a Ananthi et al. (ICICNIS 2024). A arquitetura implementada conectou `Conv1d` $\to$ `LSTM` $\to$ **uma única camada** `GATConv` $\to$ `Linear`.
+  2. *Pipeline Pandas In-Memory (`8fc874a` e `474c9e0`, 19/05/2026):* Eliminação de gargalos de leitura em disco para benchmarks clássicos em formato ZIP e teste de integridade com `KDDTrain+.txt`.
+  3. *Eliminação de I/O em Disco via Unix Domain Sockets (`589f487`, 20/05/2026):* Comunicação IPC direta entre o loader em C++ (`loader_fusion.cpp`) e o runtime Python, substituindo arquivos temporários em disco.
+  4. *Integração Linux Enterprise (`05951a2` e `6747966`, 21/05/2026):* Criação de arquivos de unidade `systemd` e padronização de diretórios no sistema de arquivos nativo do WSL2 para prevenir gargalos do subsistema 9P (`/mnt/c/`).
 
 ---
 
 ### Marco 2: Plano de Controle V2, Redes Neurais Gráficas e Dashboard NOC/SOC (28 de Maio a 01 de Junho de 2026)
 - **Commits:** `0dd18c7` $\to$ `4ec7bc4`
-- **Foco Técnico:** Estabilização do plano de controle, instrumentação gráfica tridimensional de alto impacto e preparação de relatórios acadêmicos de pré-TCC.
-- **Eventos Críticos e Decisões:**
-  1. *Plano de Controle V2 Multi-Linguagem (`0dd18c7`, 28/05/2026):* Refatoração estrutural com loaders paralelos em Go (`dashboard_go/main.go`) e Rust (`loader_fusion_rs/src/main.rs`), consolidando a verificação de paridade de dados brutos (`tools/validate_parity.py`).
-  2. *Interface Web NOC/SOC Enterprise (`f3477b4` e `9fddfa4`, 29/05/2026):* Migração completa do frontend para React/Vite com estilo corporativo, localização em PT-BR, identificação visual do IFC e grafo 3D dinâmico baseado em D3-Force (`dashboard_v2/`).
-  3. *Evidência Visual e Operacional Auditada (29/05/2026):* Demonstração funcional do painel de controle operacional do SPECTRE-GRID sob simulação contínua de tráfego, conforme capturado na evidência fotográfica histórica do projeto:
-     - **Tráfego Ingerido:** 2,51 MB (taxa estabilizada);
-     - **Pacotes Analisados:** 339 pacotes com inferências neurais ativas;
-     - **Ameaças Bloqueadas:** 83 eventos mitigados via ação coordenada eBPF (`XDP_DROP`);
-     - **Nós Ativos:** 12 endereços IP conectados em malha gráfica tridimensional;
-     - **Inspeção de Entidade Maliciosa:** Identificação e isolamento do nó atacante `185.220.101.5` (*TOR_EXIT*), com 5 fluxos correlacionados, 17,3 KB transmitidos e status de bloqueio ativado no kernel;
-     - **Monitoramento Temporal XAI:** Gráfico de Área contínuo rastreando o nível de atenção atencional da GNN ao longo do tempo (`e2fa387`).
-  4. *SPECTRE v1.1 e Ensemble Heurístico (`db1e471`, 31/05/2026):* Incorporação de motor de regras heurísticas integrado à inferência neural e registro de ataques reais via honeypot de teste.
-  5. *Infraestrutura VPS e Memorial do TCC (`4ec7bc4`, 01/06/2026):* Scripts de automação Ansible (`deploy/ansible/spectre_deploy.yml`) e estruturação do documento acadêmico de pré-TCC (`docs/tcc/Pre_TCC_SPECTRE_GRID.md`).
+- **Foco Técnico:** Estabilização do plano de controle, instrumentação visual tridimensional para testes e documentação acadêmica de pré-TCC.
+- **Eventos Críticos e Evidências:**
+  1. *Plano de Controle V2 Multi-Linguagem (`0dd18c7`, 28/05/2026):* Refatoração estrutural com protótipos de loaders em Go (`dashboard_go/main.go`) e Rust (`loader_fusion_rs/src/main.rs`).
+  2. *Interface Web NOC/SOC Enterprise (`f3477b4` e `9fddfa4`, 29/05/2026):* Frontend em React/Vite com estilo corporativo, localização em PT-BR, identificação visual do IFC e grafo 3D dinâmico baseado em D3-Force (`dashboard_v2/`).
+  3. *Evidência Visual Preservada (`scratch/dashboard_screenshot.png`):* Captura de tela gerada durante testes de integração de interface (auditada na Seção 3).
+  4. *SPECTRE v1.1 e Ensemble Heurístico (`db1e471`, 31/05/2026):* Integração de regras heurísticas e registro de eventos em honeypot local.
+  5. *Infraestrutura VPS e Memorial do TCC (`4ec7bc4`, 01/06/2026):* Documento `docs/tcc/Pre_TCC_SPECTRE_GRID.md` e playbooks de deploy Ansible.
 
 ---
 
 ### Marco 3: Protocolo NetFlow v9 e Exploração Arquitetural do DBVA (01 de Junho a 15 de Julho de 2026)
 - **Commits:** `d2f85fb` $\to$ `3726ece`
-- **Foco Técnico:** Busca por aderência a formatos de fluxo padronizados da indústria (NetFlow v9 / IPFIX) e formulação da captura em ambiente de produção (firewall pfSense).
-- **Eventos Críticos e Decisões:**
-  1. *Exploração do NF-UQ-NIDS-v2 em Nuvem (`d2f85fb` e `575826a`, 01 a 02/06/2026):* Criação do notebook `Colab_Training_NF_UQ_NIDS.ipynb` para download automatizado via API do Kaggle e preparação de amostra de 200.000 fluxos.
-     - *Auditoria Ontológica:* O dataset serviu como prova de conceito para alinhamento de esquemas de 20 features, mas **nenhum checkpoint persistente derivado deste dataset foi incorporado ao repositório**.
-  2. *Auditoria Estrutural Pós-TCC e SPECTRE_LIVRO_BASE (`255ad85` e `6296ceb`, 12/07/2026):* Consolidação da documentação técnica no compêndio `SPECTRE_LIVRO_BASE.md` (1.787 linhas).
-  3. *A Fase DBVA / DBVA-2025 (`data/DBVA/`, Julho de 2026):* Modelagem teórica da captura massiva de 982.005 fluxos gerados em gateway perimetral pfSense.
-     - *Auditoria Ontológica:* A pasta `data/DBVA/` foi criada e referenciada no roadmap arquitetural, mas **nenhum treinamento neural com este dataset foi executado ou serializado**. Permanece estritamente classificado como `[PLANEJADO NÃO EXECUTADO]`.
-  4. *Socket Feeder Contínuo (`3726ece`, 15/07/2026):* Criação de gerador de tráfego contínuo em background para alimentação do motor C++ via socket Unix, garantindo desacoplamento entre simulação e inferência.
+- **Foco Técnico:** Exploração de alinhamento ao formato NetFlow v9 / IPFIX e planejamento de topologia de gateway em pfSense.
+- **Eventos Críticos e Evidências:**
+  1. *Notebook NF-UQ-NIDS-v2 em Nuvem (`d2f85fb`, 01/06/2026):* Criação de `Colab_Training_NF_UQ_NIDS.ipynb` para download via API do Kaggle e preparação de amostra de 200.000 linhas.
+     - *Status de Rastreabilidade:* `[NÃO COMPROVADO]`. O notebook foi commitado sem saídas salvas e nenhum checkpoint correspondente foi retido no Git.
+  2. *Compilação do SPECTRE_LIVRO_BASE (`6296ceb`, 12/07/2026):* Adição do documento `SPECTRE_LIVRO_BASE.md` (1.787 linhas).
+  3. *A Fase DBVA / DBVA-2025 (`data/DBVA/`, Julho de 2026):* Modelagem teórica de captura em gateway pfSense com 982.005 fluxos.
+     - *Status de Rastreabilidade:* `[PLANEJADO NÃO EXECUTADO]`. O diretório `data/DBVA/` foi criado, mas nenhum treinamento foi registrado em relatórios ou checkpoints.
+  4. *Socket Feeder Contínuo (`3726ece`, 15/07/2026):* Script em background para injetar fluxos simulados no loader via socket Unix.
 
 ---
 
 ### Marco 4: Refinamento de Kernel eBPF/XDP e Infraestrutura Cloud (14 a 17 de Outubro de 2026)
 - **Commits:** `5015d63` $\to$ `79ed168`
-- **Foco Técnico:** Estabilidade e fidelidade de rede no driver de extração eBPF/XDP em nível de kernel Linux e padronização de ambientes de desenvolvimento reproduzíveis.
-- **Eventos Críticos e Decisões:**
-  1. *Correção de Endianness e Amostragem Ringbuf (`5015d63`, 14/10/2026):* Correção de bugs críticos de conversão de ordem de bytes (`ntohs`/`ntohl`) no cálculo de comprimento de pacote IPv4 (`iph->tot_len`) e portas L4 no programa eBPF `ebpf/spectre_xdp.c`, além de introdução de amostragem em anel de memória (*ring buffer*) para mitigar perda de eventos sob saturação de pacotes.
-  2. *Ambiente em Nuvem Reproduzível (`109e5d7`, 16/10/2026):* Configuração de container oficial no GitHub Codespaces (`.devcontainer/`) permitindo compilação e teste do pipeline em instâncias Linux Debian puras.
-  3. *Unificação do Pipeline v2.0 (`79ed168`, 17/10/2026):* Consolidação de scripts de execução (`start_spectre_v2.sh`) e documentação operacional do sistema.
+- **Foco Técnico:** Estabilidade e fidelidade de rede no driver de extração eBPF/XDP em nível de kernel Linux.
+- **Eventos Críticos e Evidências:**
+  1. *Correção de Endianness e Ringbuf (`5015d63`, 14/10/2026):* Correção de conversão de ordem de bytes (`ntohs`/`ntohl`) no comprimento de pacotes IPv4 (`iph->tot_len`) e portas TCP/UDP em `ebpf/spectre_xdp.c`. Implementação de amostragem em ring buffer de memória compartilhada.
+  2. *Ambiente em Container Codespaces (`109e5d7`, 16/10/2026):* Configuração `.devcontainer/` para compilação reproduzível em Linux Debian.
+  3. *Unificação do Pipeline v2.0 (`79ed168`, 17/10/2026):* Consolidação de scripts de execução (`start_spectre_v2.sh`).
 
 ---
 
 ### Marco 5: A Revolução Científica Anti-Leakage e Campanha do NOMS 2027 (03 a 04 de Novembro de 2026)
 - **Commits:** `1490df7` $\to$ `ffe8736`
-- **Foco Técnico:** Erradicação definitiva de contaminação temporal (*data leakage*), descoberta da heterofilia de vizinhança em grafos de rede, campanha experimental multi-seed em hardware duplo e redação do manuscrito científico para o IEEE/IFIP NOMS 2027.
-- **Eventos Críticos e Decisões:**
+- **Foco Técnico:** Erradicação de vazamento temporal (*data leakage*), estudo de ablações topológicas em GAT, campanha experimental multi-seed em hardware duplo e redação do manuscrito IEEE/IFIP NOMS 2027.
+- **Eventos Críticos e Evidências:**
   1. *Protocolo Anti-Leakage Causal Estrito (`1490df7`, 03/11/2026):*
-     - Eliminação de divisões aleatórias (*random train_test_split*), substituídas por fatiamento temporal cronológico puro (60% treino / 20% validação / 20% teste);
-     - Ajuste do normalizador (`StandardScaler`) e seleção de atributos (Top-20 Pearson) **exclusivamente na partição de treino** (linhas 0 a 120.000);
-     - Rotulagem direcional causal: um nó $v \in V_t$ recebe $y_t(v)=1$ se, e somente se, originou ao menos um fluxo malicioso como `srcip`. Nós de destino passivo (`dstip`) permanecem $y_t(v)=0$.
+     - Fatiamento temporal cronológico puro (60% treino / 20% validação / 20% teste);
+     - `StandardScaler` e seleção Top-20 Pearson ajustados **estritamente na partição de treino** (linhas 0 a 120.000);
+     - Rotulagem causal: nós de origem maliciosa (`srcip`) recebem $y=1$; destinos passivos alvejados (`dstip`) recebem $y=0$.
   2. *Construção de Snapshots Temporais Discretos $G_t = (V_t, E_t)$ (`7255007`, 03/11/2026):*
-     - Fatiamento em janelas temporais de $\Delta t = 30\text{ s}$ no dataset `UNSW-NB15_1.csv` ordenado por tempo (`Stime`/`Ltime`);
-     - Congelamento e persistência do bundle binário `data/processed/unsw_full_ebpf_30s.pt` (SHA-256 auditado).
-  3. *Descoberta da Contaminação de Vítimas e Ablações Topológicas GAT (`4ab39c0`, 03/11/2026):*
-     - *O Problema da Heterofilia:* A propagação direcionada direta ($src \to dst$) contamina nós receptores com representações maliciosas, gerando uma Taxa de Falsos Positivos de **21,39%** nas vítimas benignas.
-     - *A Solução Arquitetural:* Criação das variantes `gat_reverse` (inversão de fluxo para enriquecer o atacante), `gat_bidir` (atenção bidirecional independente com normalização de vizinhança) e `gat_residual` (projeção residual com skip gating).
-     - *Resultado:* Redução drástica do FPR de validação para **0,73% $\pm$ 0,12%** e FPR de teste para **0,50% $\pm$ 0,15%** com sustentação de **100% de Recall**.
-  4. *Campanha Experimental Multi-Seed em Hardware Heterogêneo (`f5cdfaa`, 03/11/2026):*
-     - Execução cruzada com seeds 42, 123 e 1337 no Dell G15 (GPU RTX 3050 Ampere) e Google Colab Pro (GPU Tesla T4 Turing), documentando paridade estatística e micro-variações numéricas causadas por operações atômicas não-determinísticas (`scatter_add`).
-  5. *Auditoria de Robustez na Cauda Benigna de 500k Linhas (`d41c719`, 04/11/2026):*
-     - Processamento dos 667 snapshots puramente benignos subsequentes ao horizonte ativo, comprovando estabilidade operacional com FPR inferior a 0,8%.
+     - Fatiamento em janelas $\Delta t = 30\text{ s}$ no `UNSW-NB15_1.csv` ordenado cronologicamente (`Stime`/`Ltime`);
+     - Congelamento do bundle de grafos `data/processed/unsw_full_ebpf_30s.pt` (SHA-256 verificado).
+  3. *Estudo de Ablações Topológicas GAT (`4ab39c0`, 03/11/2026):*
+     - Avaliação empírica das variantes: `cnn_lstm_pure` (sem GAT), `gat_self_loop`, `cnn_lstm_gat` (arestas direcionadas padrão $src \to dst$), `gat_reverse` ($dst \to src$), `gat_bidir` ($src \leftrightarrow dst$) e `gat_residual` (projeção linear residual).
+     - *Observação do Fenômeno de Contaminação:* Na variante direcionada padrão (`cnn_lstm_gat`), os nós benignos que recebem fluxos de atacantes sofrem FPR de **6,51%** na validação (seed 42), enquanto nós benignos não alvejados têm FPR de **0,09%** (relatório `g15_cnn_lstm_gat_seed42_30s_report.json`).
+     - *Desacoplamento Bidirecional:* A variante `gat_bidir` reduz o FPR global de validação para **$0,73\% \pm 0,14\%$** (seeds 42, 123, 1337 no Dell G15), alcançando Recall médio de **$0,9809 \pm 0,0107$** e F1 de **$0,9609 \pm 0,0082$**.
+  4. *Campanha Multi-Seed em Hardware Heterogêneo (`f5cdfaa`, 03/11/2026):*
+     - Execuções cruzadas com seeds 42, 123 e 1337 no Dell G15 (RTX 3050 Ampere) e Google Colab Pro (Tesla T4 Turing), comprovando consistência da ordem relativa de desempenho dos modelos com pequenas variações causadas por operações atômicas não-determinísticas (`scatter_add`).
+  5. *Auditoria de Falsos Positivos na Cauda Benigna de 500k Linhas (`d41c719`, 04/11/2026):*
+     - Processamento de **667 snapshots puramente benignos** (linhas 200.001 a 700.001 de `UNSW-NB15_1.csv`), totalizando 15.900 nós benignos avaliados. A variante `gat_bidir` obteve 116 falsos positivos (FPR = **0,73%**, relatório `g15_external_tail500k_fpr_report.json`).
   6. *Avaliação Externa sob Concept Drift Temporal (`e171cfb`, 04/11/2026):*
-     - Teste de generalização em partição cronológica não correlacionada de `UNSW-NB15_2.csv` (linhas 100.000 a 200.000). A GAT bidirecional alcançou $F_1 = 0,9167$, enquanto o modelo temporal puro CNN-LSTM colapsou para $F_1 = 0,6773$ (ganho de **+23,94 pontos percentuais** proporcionado pela estrutura relacional).
-  7. *Auditoria Independente, Correção e Redação NOMS 2027 (`5bfdbf7` $\to$ `ffe8736`, 04/11/2026):*
-     - Correção cirúrgica de hiperparâmetros no manuscrito ($L=10$ vs $L=5$), sincronização de tabelas de FPR, alinhamento dos 20 atributos reais e instituição da governança automatizada no GitHub Actions (Run `41904703024` aprovada com 100% de sucesso).
+     - Avaliação independente no recorte auditado de **linhas 400.000 a 600.000 de `UNSW-NB15_2.csv`** (32.550 fluxos maliciosos, 226 snapshots temporais, 8.598 nós, `refitted_on_external = False`).
+     - A variante `gat_bidir` manteve desempenho robusto ($F_1 = 0,9167 \pm 0,0177$, Precision médio $0,8837$, Recall médio $0,9525$), superando o baseline sem grafo `cnn_lstm_pure` ($F_1 = 0,6773 \pm 0,0079$), conforme relatório `g15_external_unsw_nb15_2_eval_report.json`.
+  7. *Auditoria de Integridade e Manuscrito NOMS 2027 (`5bfdbf7` $\to$ `ffe8736`, 04/11/2026):*
+     - Correção de hiperparâmetros no texto ($L=10$), alinhamento dos 20 atributos de eBPF e homologação da governança automatizada no GitHub Actions (Run `41904703024`).
 
 ---
 
-## 3. Ontologia e Genealogia dos Datasets: Da Ingestão ao Treinamento Efetivo
+## 3. Auditoria da Dashboard NOC/SOC e Evidência Visual (`scratch/dashboard_screenshot.png`)
 
-A evolução dos conjuntos de dados no projeto foi marcada pela busca contínua por representatividade temporal, integridade topológica e alinhamento com a inspeção de pacotes via eBPF/XDP.
-
-### 3.1 Matriz de Rastreabilidade Ontológica de Datasets
-
-| Dataset | Arquivos no Repositório | Período de Uso | Status Ontológico | Treinado em Checkpoint? | Avaliação Experimental? | Papel Metodológico no Projeto |
-| :--- | :--- | :--- | :--- | :---: | :---: | :--- |
-| **NSL-KDD** | `data/raw/KDDTrain+.txt`<br>`data/raw/KDDTest+.txt` | Mai/2026 | `[ADAPTAÇÃO EMPÍRICA]` | **SIM** (Legado `best_model.pth`) | Parcial (100 nós dummy, 19/05/2026) | Validação preliminar de consumo de memória e pipelines pandas in-memory. Substituído por ausência de IPs reais e timestamps contínuos. |
-| **CIC-IDS2017** | `Tuesday/Wednesday-WorkingHours.pcap_ISCX.csv` | Mai/2026 | `[ADAPTAÇÃO EMPÍRICA]` | **SIM** (Baseline preliminar) | Não persistida em relatórios formais | Prova de conceito de agregação de fluxos L4. Descartado por fragmentação de timestamps e inviabilidade de snapshots topológicos coerentes. |
-| **NF-UQ-NIDS-v2** | `Colab_Training_NF_UQ_NIDS.ipynb` | Jun/2026 | `[PLANEJADO NÃO EXECUTADO]` | **NÃO** | **NÃO** | Exploração de alinhamento ao formato NetFlow v9. Amostra de 200k scriptada no Colab, mas nenhum checkpoint foi retido. |
-| **DBVA-2025** | Diretório `data/DBVA/`<br>(citado em `SPECTRE_LIVRO_BASE.md`) | Jul/2026 | `[PLANEJADO NÃO EXECUTADO]` | **NÃO** | **NÃO** | Modelagem arquitetural de captura em gateway perimetral pfSense (982.005 fluxos). Nunca treinado; zero modelos gerados. |
-| **UNSW-NB15** *(Captura 1)* | `UNSW-NB15_1.csv`<br>`data/processed/unsw_full_ebpf_30s.pt` | Out-Nov/2026 | `[FATO COMPROVADO]` | **SIM** (`unsw_full_ebpf_30s.pt`, checkpoints multi-seed) | **SIM** (Campanhas G15 e Colab T4, NOMS 2027) | Dataset canônico da pesquisa. Utilizado no horizonte ativo (200k linhas) e estresse de FPR na cauda benigna (500k linhas). |
-| **UNSW-NB15** *(Captura 2)* | `UNSW-NB15_2.csv` | Nov/2026 | `[FATO COMPROVADO]` | **NÃO** (Avaliação zero-shot congelada) | **SIM** (Relatório `g15_external_eval_report.json`) | Teste de generalização externa sob *concept drift* temporal. Scaler e modelo congelados da Captura 1 aplicados na Captura 2. |
-
----
-
-## 4. Genealogia Científica e Atribuição Arquitetural dos Modelos
-
-### 4.1 Decomposição das Camadas do Modelo `SPECTRE_GRID`
-
-O modelo neural do SPECTRE-GRID é composto por quatro blocos funcionais sequenciais e paralelos:
-
-```mermaid
-flowchart LR
-    subgraph Entrada ["1. Entrada Multivariada"]
-        In["Tensor [N, L=10, F=20]\n(L janelas temporais por nó IP)"]
-    end
-
-    subgraph CNN ["2. Perfilador Temporal (1D-CNN)"]
-        Conv["Conv1d(F=20, out=64, k=3)\nReLU + MaxPool1d\nExtração de padrões locais"]
-    end
-
-    subgraph LSTM_Layer ["3. Historiador Temporal (LSTM)"]
-        Rec["LSTM(in=64, hidden=64, layers=1)\nCaptura dependências de longo prazo\nÚltimo hidden state h_T: Tensor [N, 64]"]
-    end
-
-    subgraph Topological ["4. Estrategista Topológico (GAT / Ablações)"]
-        direction TB
-        GAT1["GATConv(64, 64, heads=2)\n+ ELU + Dropout"]
-        GAT2["GATConv(128, 64, heads=1)\nMessage Passing no Grafo G_t"]
-        Decouple["Desacoplamento Topológico:\n- Direcionado (src -> dst)\n- Reverso (dst -> src)\n- Bidirecional (concat / avg)\n- Residual (Skip Connection)"]
-        GAT1 --> GAT2 --> Decouple
-    end
-
-    subgraph Saida ["5. Classificador Per-Nó"]
-        FC["Linear(64, 32) -> ReLU -> Linear(32, 1)\nSigmoid -> Probabilidade P(y=1)"]
-    end
-
-    In --> CNN --> LSTM_Layer --> Topological --> Saida
-```
-
-### 4.2 Mapeamento da Literatura vs. Contribuições do Projeto
-
-Para conferir máxima transparência científica e proteger o ineditismo acadêmico do autor Abraão Teixeira da Silva e do orientador Prof. Dr. Jackson Mallmann, a tabela abaixo discrimina formalmente a origem de cada componente:
-
-| Componente | Origem Científica Primária | O que a Literatura Propôs | O que o SPECTRE-GRID Herdou | O que o SPECTRE-GRID Inovou / Criou |
-| :--- | :--- | :--- | :--- | :--- |
-| **1D-CNN** | Yann LeCun et al. (Literatura clássica de Deep Learning) | Convolução unidimensional para extração de invariâncias locais em séries temporais. | Mecanismo padrão de convolução com `kernel_size=3`. | Aplicação sobre matriz temporal por nó IP agregada a partir de fluxos extraídos pelo kernel eBPF/XDP. |
-| **LSTM** | Hochreiter & Schmidhuber (1997) | Redes recorrentes com portas de esquecimento para mitigar desvanecimento de gradiente. | Estrutura padrão de célula LSTM unidirecional de camada única. | Acoplamento como "historiador" que comprime o histórico multivariado de cada IP em um embedding denso para o grafo. |
-| **CNN + LSTM Tabular** | **Ananthi et al. (ICICNIS 2024)**<br>*"Intrusion Detection Mechanism Using Deep Learning"*, pp. 188–194. | Modelo híbrido 1D-CNN + LSTM aplicado diretamente a linhas tabulares do NSL-KDD com balanceamento *Selective SMOTE*. Sem grafos, sem eBPF, sem análise em tempo real. | A inspiração conceitual inicial citada em `model.py` (`3914c23`) de concatenar temporalmente 1D-CNN com LSTM. | **Ruptura de paradigma:** O SPECTRE-GRID não classifica fluxos tabulares isolados; converte as saídas da LSTM em nós de um grafo espaço-temporal dinâmico $G_t$. |
-| **GATConv** | Petar Veličković et al. (ICLR 2018)<br>*"Graph Attention Networks"* | Mecanismo de auto-atenção mascarada para atribuição de pesos dinâmicos em vizinhanças de grafos arbitrários. | Operador padrão `GATConv` da biblioteca PyTorch Geometric. | Formulação do grafo de intrusão onde nós são IPs e arestas são fluxos dirigidos originados no kernel do Linux. |
-| **Heterofilia e Contaminação** | **INÉDITO (SPECTRE-GRID)** | Não reportado na literatura clássica de GNN aplicada a NIDS (maioria assume grafos não-direcionados ou homogêneos). | Nenhuma dependência externa. | **Formulação teórica e comprovação empírica:** Prova de que $src \to dst$ contamina vítimas benignas com as features dos fluxos maliciosos, elevando o FPR para 21%. |
-| **Ablações de Direcionalidade** | **INÉDITO (SPECTRE-GRID)** | Modelos GNN em IDS tratam arestas como bidirecionais ingênuas ou ignoram o sentido causal. | Nenhuma dependência externa. | Implementação e validação comparada das variantes `gat_reverse`, `gat_bidir` e `gat_residual`, reduzindo o FPR em 88% sem perder Recall. |
-| **Snapshots Anti-Leakage** | **INÉDITO (SPECTRE-GRID)** | Métodos anteriores misturavam fluxos aleatoriamente em grafos estáticos (*transductive leakage*). | Princípio de particionamento cronológico geral. | Protocolo indutivo estrito $G_t = (V_t, E_t)$ com normalizador e Top-K congelados no treino e rotulagem puramente causal ($src=1, dst=0$). |
-| **Paridade eBPF/XDP Modalidade B** | **INÉDITO (SPECTRE-GRID)** | Sistemas da literatura utilizam atributos L7/bidirecionais impossíveis de extrair in-kernel em linha. | Drivers XDP eBPF genéricos. | Extração unidirecional de 6 contadores atômicos em tempo de pacote no kernel Linux acoplada à inferência neural em menos de 4 ms. |
-
----
-
-## 5. Reconciliação Histórica da Contagem de Ataques e Snapshots
-
-Durante a evolução das anotações e relatórios técnicos do projeto, foram registradas duas contagens distintas para os ataques e snapshots do dataset canônico `UNSW-NB15_1.csv`. A presente auditoria reconcilia definitivamente a discrepância:
+A imagem preservada em `scratch/dashboard_screenshot.png` constitui evidência histórica do estágio de desenvolvimento da interface em 29 de Maio de 2026 (Marco 2). Para manter a integridade científica, categorizam-se rigorosamente as informações visíveis:
 
 ```mermaid
 flowchart TD
-    Raw["UNSW-NB15_1.csv (700.001 registros brutos)"]
-    
-    subgraph Fase1 ["Fase 1: Estimativa Exploratória Preliminar (Outubro de 2026)"]
-        F1_A["Contagem aproximada por leitura sequencial parcial"]
-        F1_Count["25.176 ataques anotados preliminarmente no ADR-004"]
-        F1_Tail["1.488 snapshots estimados para a cauda benigna"]
-        F1_A --> F1_Count
-        F1_A --> F1_Tail
+    subgraph UI ["scratch/dashboard_screenshot.png (29/05/2026)"]
+        UI_Head["Cabeçalho da Dashboard:\n- Tráfego Ingerido: 2.51 MB\n- Pacotes Analisados: 339\n- Ameaças Bloqueadas: 83\n- Nós Ativos: 12"]
+        UI_Panel["Painel Lateral de Inspeção:\n- IP: 185.220.101.5 (TOR_EXIT)\n- Status: BLOQUEADO\n- Fluxos Relacionados: 5\n- Bytes Enviados: 17.3 KB"]
+        UI_Table["Log de Eventos:\n- Horário, IP Origem, IP Destino\n- Atenção GNN (%), Ação (PERMITIDO / BLOQUEADO)"]
     end
 
-    subgraph Fase2 ["Fase 2: Auditoria Cronológica Estrita com Hash SHA-256 (Novembro de 2026)"]
-        F2_Sort["Mergesort estrito por timestamp contínuo (Stime / Ltime)"]
-        F2_Active["Horizonte Ativo: Linhas 0 .. 200.000\n(22.215 ataques reais auditados entre as linhas 13 e 186.807)"]
-        F2_Tail["Cauda Benigna: Linhas 200.001 .. 700.001\n(Exatamente 667 snapshots discretos a Δt = 30s, 0 ataques, 15.900 nós)"]
-        F2_Sort --> F2_Active
-        F2_Sort --> F2_Tail
+    subgraph Cat ["Separação Ontológica de Evidências"]
+        V_UI["[VALOR EXIBIDO NA INTERFACE]\nMétricas visuais renderizadas pelo componente React"]
+        V_Test["[TESTE CONTROLADO / SIMULAÇÃO]\nAmbiente de demonstração alimentado por script de tráfego sintético"]
+        V_NComp["[NÃO DEMONSTRADO ISOLADAMENTE PELA IMAGEM]\n- Descarte físico no kernel via XDP_DROP em hardware real\n- Latência WAN de rede fim-a-fim\n- Eficácia estatística do classificador (F1/Recall)\n- Validade causal formal da pontuação de Atenção GNN"]
+        V_Med["[MEDIÇÃO OPERACIONAL REPRODUZÍVEL]\nAuditorias separadas de latência em g15_latency_vram_benchmark.json\n(3,14 a 5,42 ms por snapshot na GPU)"]
     end
 
-    Raw --> Fase1
-    Raw --> Fase2
-    F1_Count -.-> |"Reconciliado e corrigido pelo relatório\ng15_dataset_chronology_audit.json"| F2_Active
-    F1_Tail -.-> |"Reconciliado e corrigido pelo relatório\ng15_external_tail500k_fpr_report.json"| F2_Tail
+    UI_Head --> V_UI
+    UI_Panel --> V_UI
+    UI_Table --> V_UI
+    V_UI --> V_Test
+    V_Test --> V_NComp
+    V_NComp --> V_Med
 ```
 
-### 5.1 Fatos e Evidências Auditadas
-1. **O Registro Preliminar:** A anotação histórica de 25.176 ataques e 1.488 snapshots em versões preliminares de `docs/SCIENTIFIC_MEMORY.md` decorreu de uma inspeção heurística não discretizada efetuada antes da imposição da ordenação cronológica obrigatória por timestamps de início e fim de fluxo (`Stime`, `Ltime`).
-2. **A Auditoria Quantitativa Conclusiva:** O relatório de auditoria cronológica em hardware real `data/processed/g15_dataset_chronology_audit.json` (executado com SHA-256 verificado `7d851bbeabd2057be6a17b8f9e612fc996d93e150ff2e2ff62cc8d4234f9a081`) confirmou matematicamente:
-   - O horizonte ativo (primeiras 200.000 linhas) concentra **exatamente 22.215 fluxos maliciosos**, ocorrendo estritamente entre os registros indexados de 13 a 186.807;
-   - Os 500.001 registros restantes (linhas 200.001 a 700.001) contêm rigorosamente **0 ataques**;
-   - Sob a janela temporal canônica de $\Delta t = 30\text{ s}$, a cauda benigna é particionada em **exatamente 667 snapshots discretos**, agregando 15.900 nós benignos (`g15_external_tail500k_fpr_report.json`).
-3. **Harmonização da Governança:** O ADR-004 de `docs/SCIENTIFIC_MEMORY.md` foi atualizado para documentar historicamente a origem da estimativa preliminar e fixar 22.215 ataques e 667 snapshots como a verdade empírica auditada da pesquisa.
+### 3.1 Valores Exibidos na Interface vs. Medições Operacionais
+1. **`[VALOR EXIBIDO NA INTERFACE]`:** Os contadores "2.51 MB Ingeridos", "339 Pacotes Analisados", "83 Ameaças Bloqueadas" e "12 Nós Ativos", bem como o status "BLOQUEADO" atribuído a `185.220.101.5`, representam o estado visual do componente React durante a simulação.
+2. **`[TESTE CONTROLADO]`:** Esse ensaio foi executado em ambiente de desenvolvimento com tráfego gerado programaticamente (`continuous_flow_generator.py` / `simulate_dashboard_traffic.py`) conectado ao motor backend via WebSocket/API.
+3. **Limites Probatórios:** Uma captura de tela não comprova:
+   - Descarte físico de pacotes por `XDP_DROP` em enlace de rede em produção;
+   - Latência real de mitigação em hardware de rede;
+   - Eficácia do classificador neural sob tráfego hostil real;
+   - Validação estatística ou explicabilidade causal dos pesos de atenção exibidos.
+4. **`[MEDIÇÃO OPERACIONAL REPRODUZÍVEL]`:** A latência do pipeline de inferência local foi medida separadamente no relatório `data/processed/g15_latency_vram_benchmark.json`, documentando **$3,14\text{ ms}$** a **$5,42\text{ ms}$** por snapshot para inferência neural na GPU RTX 3050. O relatório explicita que esses tempos não incluem a propagação WAN de rede nem a atualização de mapas BPF em enlaces externos.
 
 ---
 
-## 6. Matriz de Rastreabilidade Científica Completa
+## 4. Genealogia Detalhada dos Conjuntos de Dados
 
-A matriz abaixo vincula cada afirmação científica central do SPECTRE-GRID à sua evidência primária, arquivo de origem, commit Git associado e respectivo grau de certeza epistêmica:
+A tabela a seguir discrimina de forma independente as etapas de ciclo de vida de cada conjunto de dados explorado no SPECTRE-GRID:
 
-| ID | Afirmação Científica | Evidência Empírica Primária | Arquivo de Origem e Linha | Commit Git | Nível de Certeza |
+| Dataset | Ingestão e Pré-processamento | Execução Efetiva de Treino | Checkpoint Existente no Repositório | Experimentos de Avaliação | Datas e Commits de Evidência | Lacunas de Rastreabilidade |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **NSL-KDD** | Leitura in-memory com tratamento de infinitos e normalização tabular básica. | Treinado em modelo baseline tabular de 100 nós dummy. | **SIM** (`best_model.pth`, 364 KB, commit `1cd8b3a`). | `benchmark_results.json` (Acc: 0.60, Rec: 0.8571, F1: 0.75, 20 nós de teste). | 19/05/2026 (`474c9e0`), 26/07/2026 (`1cd8b3a`). | Não possui IPs reais nem timestamps contínuos; conexões eram sintéticas. Não utilizado para snapshots temporais $G_t$. |
+| **CIC-IDS2017** | Carregamento preliminar de arquivos de terça e quarta-feira (`pcap_ISCX.csv`). | `NÃO COMPROVADO` no repositório. | **NÃO** (nenhum `.pth` associado retido no Git). | Nenhum relatório formal de métricas preservado. | 19/05/2026 (`474c9e0`), 26/07/2026 (`1cd8b3a`). | Ausência de continuidade temporal de longo prazo para discretização em snapshots. Sem checkpoints ou logs preservados. |
+| **NF-UQ-NIDS-v2** | Download scriptado do Kaggle e extração de amostra de 200k linhas (`NF-UQ-NIDS-v2-sample.csv`). | `NÃO COMPROVADO` no repositório. | **NÃO** (nenhum `.pth` associado retido no Git). | Nenhum relatório JSON de métricas preservado. | 01/06/2026 (`d2f85fb`), 02/06/2026 (`575826a`). | O notebook não contém saídas de células salvas; treinos em instâncias efêmeras do Colab não foram retidos no versionamento. |
+| **DBVA-2025** *(pfSense)* | Especificação arquitetural de 982.005 fluxos de gateway no Livro Base. | `NÃO COMPROVADO` (Zero treinos registrados). | **NÃO** (nenhum `.pth` ou `.pt` na pasta `data/DBVA/`). | Nenhum relatório experimental gerado. | 12/07/2026 (`6296ceb`). | Proposta de infraestrutura e estudo de caso para TCC; permaneceu como planejamento arquitetural sem dados coletados. |
+| **UNSW-NB15** *(Captura 1)* | Mergesort temporal, fatiamento em janelas $\Delta t = 30\text{ s}$, scaler congelado nas primeiras 120k linhas, 20 features Pearson. | **SIM** (Dell G15 e Colab T4, seeds 42, 123, 1337 nas 6 variantes). | **SIM** (Bundle `unsw_full_ebpf_30s.pt` e checkpoints `g15_*_best.pth`). | Relatórios JSON exaustivos: horizonte ativo (200k), cauda benigna (500k, 667 snapshots) e benchmark de latência. | 03/11/2026 (`1490df7`, `7255007`, `4ab39c0`), 04/11/2026 (`f5cdfaa`, `d41c719`). | O conjunto de teste holdout teve acessos diagnósticos prévios em fases anteriores; a Fase 2 utilizou estritamente `--val_only`. |
+| **UNSW-NB15** *(Captura 2)* | Extração de **linhas 400.000 a 600.000 de `UNSW-NB15_2.csv`** (32.550 ataques, 226 snapshots, $L=10$, $F=20$). | **NÃO** (Avaliação com modelos e scalers estritamente congelados da Captura 1). | Não gera checkpoints (utiliza os checkpoints da Captura 1). | Relatório `g15_external_unsw_nb15_2_eval_report.json` ($F_1 = 0,9167 \pm 0,0177$ para `gat_bidir`). | 04/11/2026 (`e171cfb`). | Amostragem selecionada com base na presença prévia de ataques (não puramente cega); testada sob `refitted_on_external = False`. |
+
+---
+
+## 5. Genealogia Científica, Literatura Prévia e Arquitetura Executada
+
+### 5.1 Diagrama da Arquitetura Fielmente Executada (`model.py`)
+
+A inspeção direta de `model.py` (linhas 47 a 148) comprova que o modelo utiliza **uma única camada `GATConv`**, e a variante residual utiliza uma **projeção linear aditiva**, sem mecanismos de gating:
+
+```mermaid
+flowchart TD
+    subgraph Input ["Entrada de Dados"]
+        X["Tensor x: [N, seq_len=10, num_features=20]\n(N nós por snapshot)"]
+        EI["Tensor edge_index: [2, E]\n(Conectividade de arestas do snapshot G_t)"]
+    end
+
+    subgraph CNN ["1. Perfilador Temporal (1D-CNN)"]
+        X_Trans["x.transpose(1, 2) -> [N, 20, 10]"]
+        Conv1["nn.Conv1d(20, 32, kernel_size=3, padding=1) + BatchNorm1d + ReLU"]
+        Conv2["nn.Conv1d(32, 32, kernel_size=3, padding=1) + BatchNorm1d + ReLU"]
+        X_Trans --> Conv1 --> Conv2
+    end
+
+    subgraph LSTM_Block ["2. Historiador Temporal (LSTM)"]
+        CNN_Trans["cnn_out.transpose(1, 2) -> [N, 10, 32]"]
+        LSTM_Op["nn.LSTM(input_size=32, hidden_size=64, num_layers=1, batch_first=True, bidirectional=False)"]
+        H_Last["h_last = h_n[-1] -> Tensor [N, 64]"]
+        CNN_Trans --> LSTM_Op --> H_Last
+    end
+
+    subgraph GAT_Block ["3. Estrategista Topológico (GATConv Única)"]
+        GAT_Op["nn.GATConv(in_channels=64, out_channels=64, heads=4, concat=True)\nSaída: feat_out [N, 256]"]
+        Res_Proj["Se use_residual: residual_proj = nn.Linear(64, 256)\nfeat_out = feat_out + residual_proj(h_last)"]
+        H_Last --> GAT_Op
+        EI --> GAT_Op
+        GAT_Op --> Res_Proj
+    end
+
+    subgraph Classifier ["4. Classificador Per-Nó (MLP)"]
+        FC1["nn.Linear(256, 128) + ReLU + Dropout(0.3)"]
+        FC2["nn.Linear(128, 64) + ReLU + Dropout(0.3)"]
+        FC3["nn.Linear(64, 1) -> Logits [N]"]
+        Res_Proj --> FC1 --> FC2 --> FC3
+    end
+
+    X --> X_Trans
+```
+
+### 5.2 Auditoria da Relação com Ananthi et al. (ICICNIS 2024) e Literatura Prévia
+- **A Referência em `model.py`:** O arquivo `model.py` cita no cabeçalho:  
+  *P. Ananthi, K. Nirmaladevi, S. Naveen Kumar, "Intrusion Detection Mechanism Using Deep Learning", ICICNIS 2024, DOI: 10.1109/ICICNIS64247.2024.10823331.*
+- **O Conteúdo Efetivo do Artigo de Ananthi et al.:** O artigo avalia modelos de Deep Learning em cenários de segurança para redes IoT, enfatizando métricas balanceadas (recall e sensibilidade). O artigo **não utiliza GNNs, não emprega GATConv, não trabalha com grafos espaço-temporais e não implementa drivers de extração eBPF/XDP**.
+- **Pesquisas Anteriores com CNN-LSTM-GNN:** O emprego simultâneo de CNN, LSTM e redes neurais em grafos para detecção de intrusão já foi explorado por outros pesquisadores na literatura internacional. Por exemplo, **Tripathi e Saroj (2025)** (*"Intrusion Detection Mechanism based on Deep Learning and Hash Method"*, apresentado no ICICAT 2025) propuseram uma arquitetura híbrida multidimensional integrando **CNN-LSTM-GNN-ANN**.
+- **Categorização Rigorosa da Autoria:**
+  1. *Técnicas criadas por outros pesquisadores:* Convoluções 1D (LeCun et al.); células LSTM (Hochreiter & Schmidhuber, 1997); operadores de atenção em grafos GATConv (Veličković et al., 2018); acoplamento conceitual de CNN e LSTM em IDS (Ananthi et al., 2024, e trabalhos precedentes); arquiteturas híbridas CNN-LSTM-GNN em IDS (Tripathi & Saroj, 2025).
+  2. *Bibliotecas e ferramentas reutilizadas:* PyTorch, PyTorch Geometric, scikit-learn, Clang e a infraestrutura de kernel do Linux (libbpf/XDP).
+  3. *Integrações e adaptações desenvolvidas no SPECTRE-GRID:* Estruturação de fluxos de rede em snapshots discretos causais $G_t = (V_t, E_t)$ com agregação temporal de janelas $[N, L=10, F=20]$; integração com driver eBPF/XDP de extração in-kernel; implementação das variantes de direcionalidade de arestas em `train.py` (arestas reversas $dst \to src$, bidirecionais $src \leftrightarrow dst$ e projeção linear residual aditiva).
+  4. *Contribuições experimentais observadas no projeto:* Identificação empírica do aumento de falso positivo em vítimas alvejadas sob arestas direcionadas diretas ($FPR = 6,51\%$ vs $0,09\%$ em nós não alvejados); redução do FPR de validação para $0,73\%$ com a variante bidirecional; manutenção de $F_1 = 0,9167$ na transferência para dados externos de `UNSW-NB15_2.csv` (linhas 400.000..600.000).
+
+---
+
+## 6. Reconciliação das Métricas e Contagem de Ataques
+
+### 6.1 Reconciliação da Contagem de Ataques e Snapshots
+1. **O Registro Preliminar:** Versões preliminares de anotações técnicas e do ADR-004 registraram *25.176 ataques* e *1.488 snapshots*. Esse número proveio de uma amostragem preliminar não discretizada antes da aplicação do algoritmo canônico de ordenação temporal.
+2. **A Contagem Auditada por Hash SHA-256:** O relatório `data/processed/g15_dataset_chronology_audit.json` (executado sobre o CSV com hash SHA-256 verificado `7d851bbe...`) fixou:
+   - O horizonte ativo (primeiras 200.000 linhas) contém **exatamente 22.215 ataques reais**, distribuídos estritamente entre os registros indexados de 13 a 186.807;
+   - Os 500.001 registros subsequentes (linhas 200.001 a 700.001) contêm **0 ataques**;
+   - Sob a discretização canônica $\Delta t = 30\text{ s}$, a cauda benigna é dividida em **exatamente 667 snapshots temporais** contendo 15.900 nós benignos (`g15_external_tail500k_fpr_report.json`).
+
+### 6.2 Reconciliação das Métricas de Validação da GAT Bidirecional
+- **Recall de Validação:** O recall médio da variante `gat_bidir` na validação nas 3 seeds no Dell G15 é de **$0,9809 \pm 0,0107$** (Seed 42: $0,9948$, Seed 123: $0,9792$, Seed 1337: $0,9688$). Afirmações anteriores de "Recall de 100%" foram corrigidas.
+- **FPR de Validação:** O FPR médio de validação é de **$0,0073 \pm 0,0014$** ($0,73\% \pm 0,14\%$).
+- **FPR na Cauda Benigna de 500k:** Em 15.900 nós benignos (667 snapshots), a variante `gat_bidir` gerou 116 alarmes falsos, resultando em FPR de **$0,0073$** ($0,73\%$).
+- **Status do Holdout de Teste:** Os relatórios multi-seed da Fase 2 operaram com a flag `--val_only` (campo `held_out_test_metrics: null`). Valores de holdout não são apresentados como validação cega final.
+
+---
+
+## 7. Matriz de Rastreabilidade Científica Corrigida
+
+| ID | Afirmação / Fato | Evidência Empírica Primária | Arquivo de Origem e Linha | Commit Git | Nível de Certeza |
 | :---: | :--- | :--- | :--- | :---: | :---: |
-| **M-01** | O pipeline não possui *data leakage* temporal nem contaminação de normalizadores. | `StandardScaler` ajustado apenas nas primeiras 120k linhas; `refitted_on_external = False`. | `preprocessor.py` (L120-L165)<br>`tests/test_leakage_free_pipeline.py` (L55-L102) | `1490df7` | `[FATO COMPROVADO]` |
-| **M-02** | O horizonte ativo contém 22.215 ataques e a cauda benigna possui 667 snapshots com 0 ataques. | JSON de auditoria cronológica com hash do CSV `UNSW-NB15_1.csv` (`7d851bbe...`). | `data/processed/g15_dataset_chronology_audit.json`<br>`docs/SCIENTIFIC_MEMORY.md` (ADR-004) | `d41c719` / `5bfdbf7` | `[FATO COMPROVADO]` |
-| **M-03** | A GAT com arestas dirigidas padrão ($src \to dst$) sofre de contaminação de vizinhança (FPR = 21,39%). | Matriz de confusão da variante `gat_directed`: $FP = 246$, $TN = 904$ na validação. | `data/processed/g15_phase2_gat_directed_multi_seed_report.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
-| **M-04** | A GAT bidirecional reduz o FPR de validação em 88% ($0,73\% \pm 0,12\%$) preservando 100% de Recall. | Relatório multi-seed (Dell G15 seeds 42, 123, 1337): $Recall = 1,0000$, $F1 = 0,9618 \pm 0,0063$. | `data/processed/g15_phase2_gat_bidir_multi_seed_report.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
-| **M-05** | Na cauda benigna de 500k linhas (estresse de falso alarme), `gat_bidir` atinge FPR de $0,73\%$. | Processamento de 15.900 nós benignos: 116 alarmes falsos em 667 snapshots. | `data/processed/g15_external_tail500k_fpr_report.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
-| **M-06** | A representação gráfica espacial previne colapso por *concept drift* em dados externos não correlacionados. | Avaliação em `UNSW-NB15_2.csv`: `gat_bidir` obtém $F_1 = 0,9167$ vs. $F_1 = 0,6773$ do CNN-LSTM ($+23,94\text{ p.p.}$). | `data/processed/g15_external_eval_report.json` | `e171cfb` | `[FATO COMPROVADO]` |
-| **M-07** | O sensor eBPF/XDP estrito in-kernel (Modalidade B) atinge $F_1 > 0,91$ com latência de inferência de 3,36 ms. | Benchmark de latência e inferência com 6 features unidirecionais em tempo de pacote. | `data/processed/g15_phase2_ebpf_sensor_strict_report.json`<br>`data/processed/g15_phase2_latency_benchmark.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
-| **M-08** | Resultados em GPUs heterogêneas (RTX 3050 vs. Tesla T4) mantêm a hierarquia de modelos com $\Delta F_1 \sim 0,01$. | Comparativo multi-seed cruzado G15 (Ampere) vs. Colab Pro (Turing). | `data/processed/colab_t4_gat_bidir_seed42_30s_report.json`<br>`docs/NOMS2027_METHODOLOGY_AND_RESULTS.md` | `e171cfb` | `[FATO COMPROVADO]` |
-| **M-09** | A interface de monitoramento e o controle operacional NOC/SOC foram demonstrados com 83 mitigações ativas. | Captura de tela do sistema em operação com nó `185.220.101.5` bloqueado via `XDP_DROP` e 339 pacotes analisados. | `scratch/dashboard_screenshot.png`<br>`dashboard_v2/src/App.jsx` | `f3477b4` / `9fddfa4` | `[FATO COMPROVADO]` |
-| **M-10** | O dataset DBVA-2025 foi planejado para integrar tráfego real de gateway pfSense com 982k fluxos. | Especificação detalhada da topologia pfSense no Livro Base; ausência de checkpoints treinados. | `docs/SPECTRE_LIVRO_BASE.md` (L450-L520)<br>`data/DBVA/` | `6296ceb` | `[PLANEJADO NÃO EXECUTADO]` |
-| **M-11** | Ananthi et al. (ICICNIS 2024) fundamenta a extração temporal do SPECTRE-GRID. | O artigo de Ananthi propôs CNN+LSTM tabular no NSL-KDD; grafos e eBPF foram criados no SPECTRE-GRID. | `model.py` (L1-L25)<br>ICICNIS 2024, pp. 188–194 | `3914c23` | `[ADAPTAÇÃO EMPÍRICA]` |
+| **M-01** | O pipeline não possui vazamento temporal de normalizadores (`refitted_on_external = False`). | `StandardScaler` ajustado apenas nas primeiras 120k linhas de treino. | `preprocessor.py` (L120-L165)<br>`tests/test_leakage_free_pipeline.py` | `1490df7` | `[FATO COMPROVADO]` |
+| **M-02** | O horizonte ativo contém 22.215 ataques reais e a cauda benigna possui 667 snapshots com 0 ataques. | JSON de auditoria cronológica sobre `UNSW-NB15_1.csv` (SHA-256 `7d851bbe...`). | `data/processed/g15_dataset_chronology_audit.json`<br>`docs/SCIENTIFIC_MEMORY.md` (ADR-004) | `d41c719` / `5bfdbf7` | `[FATO COMPROVADO]` |
+| **M-03** | Na variante direcionada padrão (`cnn_lstm_gat`), nós benignos alvejados por atacantes têm FPR 70x maior que nós não alvejados (6,51% vs 0,09% na seed 42). | Detalhamento de grupos de nós no relatório JSON verificado. | `data/processed/g15_cnn_lstm_gat_seed42_30s_report.json`<br>`data/processed/g15_phase2_consolidated_summary.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
+| **M-04** | A GAT bidirecional atinge F1 de 0,9609 ± 0,0082, Recall de 0,9809 ± 0,0107 e FPR de 0,73% ± 0,14% na validação. | Relatórios individuais multi-seed no Dell G15 (seeds 42, 123, 1337). | `data/processed/g15_gat_bidir_seed42_30s_report.json`<br>`data/processed/g15_gat_bidir_seed123_30s_report.json`<br>`data/processed/g15_gat_bidir_seed1337_30s_report.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
+| **M-05** | Na cauda benigna de 500k linhas (15.900 nós em 667 snapshots), a `gat_bidir` gera 116 alarmes falsos (FPR = 0,73%). | Relatório de avaliação contínua sobre a cauda benigna congelada. | `data/processed/g15_external_tail500k_fpr_report.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
+| **M-06** | A estrutura de grafos previne colapso por concept drift no recorte de linhas 400.000..600.000 de `UNSW-NB15_2.csv` (`gat_bidir` F1 = 0,9167 vs CNN-LSTM puro F1 = 0,6773). | Relatório de avaliação externa com scaler e modelo da Captura 1 congelados. | `data/processed/g15_external_unsw_nb15_2_eval_report.json` | `e171cfb` | `[FATO COMPROVADO]` |
+| **M-07** | Sob o sensor eBPF estrito (Modalidade B, 6 contadores in-kernel), a variante residual atinge F1 = 0,9343 (seed 42) e F1 = 0,9143 (seed 123); latência neural local é de 3,14 a 5,42 ms/snapshot. | Relatório de avaliação do sensor estrito e benchmark local de GPU. | `data/processed/g15_modality_b_ebpf_sensor_strict_report.json`<br>`data/processed/g15_latency_vram_benchmark.json` | `f5cdfaa` | `[FATO COMPROVADO]` |
+| **M-08** | GPUs heterogêneas (RTX 3050 vs Tesla T4) mantêm a hierarquia relativa de modelos com variação $\Delta F_1 \sim 0,01$. | Comparativo multi-seed Dell G15 vs Colab Pro T4. | `data/processed/colab_t4_phase2_reports.json`<br>`docs/NOMS2027_METHODOLOGY_AND_RESULTS.md` | `e171cfb` | `[FATO COMPROVADO]` |
+| **M-09** | A interface React NOC/SOC foi implementada e demonstrada em teste controlado com exibição de topologia 3D e contadores visuais. | Captura de tela da interface e código-fonte React. Não comprova descarte físico no kernel nem line-rate WAN. | `scratch/dashboard_screenshot.png`<br>`dashboard_v2/src/App.jsx` | `f3477b4` / `9fddfa4` | `[VALOR EXIBIDO NA INTERFACE]` |
+| **M-10** | O dataset DBVA-2025 foi planejado para integrar 982k fluxos de firewall pfSense. | Especificação no Livro Base; nenhum treinamento comprovado ou checkpoint produzido. | `docs/SPECTRE_LIVRO_BASE.md`<br>`data/DBVA/` | `6296ceb` | `[PLANEJADO NÃO EXECUTADO]` |
+| **M-11** | `model.py` cita Ananthi et al. (ICICNIS 2024); trabalhos contemporâneos como Tripathi e Saroj (2025) já propuseram CNN-LSTM-GNN em IDS. | Docstring de `model.py` e artigos indexados no IEEE Xplore / ResearchGate. | `model.py` (L6-L12)<br>DOI: 10.1109/ICICNIS64247.2024.10823331<br>Tripathi & Saroj (ICICAT 2025) | `3914c23` | `[ADAPTAÇÃO EMPÍRICA]` |
 
 ---
 
-## 7. Parecer Conclusivo sobre o Ineditismo do SPECTRE-GRID
+## 8. Limitações da Reconstrução Histórica e Contribuições Científicas Candidatas
 
-Com base em 48 commits analisados, auditoria dos arquivos de código, notebooks de experimentação, logs de terminal e revisão cruzada com a literatura científica (incluindo Ananthi et al., 2024, e trabalhos clássicos de GNN em segurança cibernética), emite-se o seguinte **Parecer Técnico-Científico Conclusivo**:
+### 8.1 Limitações da Reconstrução Histórica
+1. **Ambientes Efêmeros Não Retidos:** Treinamentos executados no Google Colab durante a fase intermediária (Junho a Julho de 2026) que não salvaram arquivos `.pth` ou saídas de células no repositório GitHub permanecem formalmente classificados como `NÃO COMPROVADO`.
+2. **Telemetria de Desenvolvimento Inicial:** Os primeiros ensaios de Maio de 2026 foram focados em viabilidade funcional de software, de modo que métricas estatísticas consolidadas só passaram a ser geradas sistematicamente a partir da instituição do protocolo livre de vazamento em Novembro de 2026.
+3. **Escopo da Avaliação Externa:** A avaliação externa em `UNSW-NB15_2.csv` incidiu sobre uma fatia de 200.000 registros selecionada por conter alta densidade de ataques (linhas 400.000 a 600.000), o que não deve ser confundido com uma amostragem completamente cega de todo o tráfego da rede.
 
-### 7.1 O Que Não É Inédito (Estado da Arte Incorporado)
-- A extração de características locais em séries temporais utilizando Convolução 1D (`Conv1d`);
-- A captura de dependências sequenciais recorrentes via Long Short-Term Memory (`LSTM`);
-- A proposta de conectar CNN-1D a LSTM para análise tabular em detecção de intrusão, originalmente formulada por **Ananthi et al. (ICICNIS 2024)** para o dataset estático NSL-KDD;
-- O algoritmo genérico de agregação de vizinhança com atenção neural (`GATConv` de Veličković et al., 2018);
-- O mecanismo básico de bloqueio e descarte de pacotes em drivers de rede Linux via gancho eBPF/XDP (`XDP_DROP`).
-
-### 7.2 O Que É Inequivocamente Inédito e Proprietário do SPECTRE-GRID
-1. **A Descoberta e Demonstração da Heterofilia de Vizinhança em Grafos NIDS:** A comprovação matemática e empírica de que modelos GAT aplicados a fluxos direcionados de rede sofrem de contaminação por homofilia reversa — o nó atacante transfere seu vetor de ameaça para a vítima passiva, induzindo o classificador a inflar o falso positivo da vítima para 21,39%.
-2. **O Desacoplamento Topológico Causal (`gat_bidir` e `gat_residual`):** A concepção e validação de mecanismos de propagação bidirecional e conexão residual projetada que eliminam a contaminação da vítima, derrubando o FPR em 88% ($0,73\% \pm 0,12\%$) enquanto mantêm 100% de precisão de detecção no atacante.
-3. **O Protocolo Indutivo Anti-Leakage de Snapshots Temporais Causalmente Isolados:** A metodologia de discretização estrita de tráfego de rede em janelas independentes de tempo $\Delta t = 30\text{ s}$ com rotulagem direcional estrita ($src=1, dst=0$) e normalizadores congelados exclusivamente no horizonte de treino.
-4. **Resiliência a Concept Drift Temporal via Estrutura Relacional:** A demonstração de que a topologia de grafo mitiga a degradação temporal severa quando testada em dados externos desfasados (`UNSW-NB15_2.csv`), superando abordagens puramente temporais (CNN-LSTM) em **+23,94 pontos de F1-Score**.
-5. **Delineamento e Paridade entre Benchmark L3/L4 e Sensor eBPF Operacional Estrito:** A resolução categórica da paridade de atributos, estabelecendo a Modalidade A (20 features offline) e a Modalidade B (6 contadores unidirecionais in-kernel estritos no XDP atingindo $F_1 > 0,91$ em 3,36 ms), sem promessas irrealistas de line-rate para atributos que exigem remontagem de sessão L7.
+### 8.2 Contribuições Científicas Candidatas
+As seguintes proposições constituem contribuições técnicas desenvolvidas e observadas no SPECTRE-GRID, devendo ser submetidas a revisão por pares independente e comparação adicional com o estado da arte:
+1. **Evidência Empírica da Contaminação de Vizinhança:** Demonstração documentada de que arestas direcionadas puras ($src \to dst$) em grafos de fluxo aumentam significativamente os falsos positivos em nós benignos alvejados (de 0,09% para 6,51% na seed 42).
+2. **Mitigação Topológica Causal:** Demonstração de que modelagens de arestas reversas ou bidirecionais combinadas com projeção residual reduzem o FPR global de validação para $0,73\% \pm 0,14\%$ preservando recall de $0,9809 \pm 0,0107$.
+3. **Protocolo Indutivo Anti-Leakage para Snapshots de Rede:** Estruturação de um pipeline estritamente causal em janelas temporais discretas ($\Delta t = 30\text{ s}$), com congelamento estrito de normalizadores e atributos no treino.
+4. **Resiliência a Concept Drift Temporal:** Evidência experimental de que a agregação relacional em grafo atenua a degradação temporal frente a modelos sem grafo ($F_1 = 0,9167$ vs $0,6773$ do baseline temporal) em dados defasados no tempo.
+5. **Separação Categórica entre Atributos Offline e Contadores In-Kernel:** Delineamento formal da viabilidade de inferência com contadores unidirecionais eBPF/XDP estritos (Modalidade B, atingindo $F_1 > 0,91$ com a variante residual), evitando asserções infundadas de line-rate para métricas bidirecionais de camada de aplicação.
 
 ---
-*Documento homologado e registrado no Livro de Memória Científica do Projeto SPECTRE-GRID.*  
-*Assinatura digital auditada via Git Commit SHA `ffe8736`.*
+*Documento homologado em conformidade com o Quality Gate Permanente do SPECTRE-GRID.*  
+*Commit de Referência:* `fix/leakage-free-pipeline`.
