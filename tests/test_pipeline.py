@@ -159,6 +159,16 @@ def test_ebpf_compilation():
             print("  [AVISO] Clang não encontrado no PATH para compilar eBPF. Pulando.")
             return
 
+    # Validação de dependências de headers no Linux
+    if platform.system() == "Linux":
+        bpf_helpers = Path("/usr/include/bpf/bpf_helpers.h")
+        if not bpf_helpers.exists():
+            if pytest:
+                pytest.skip("Headers do libbpf (/usr/include/bpf/bpf_helpers.h) não encontrados. Requer pacote libbpf-dev.")
+            else:
+                print("  [AVISO] Headers do libbpf (/usr/include/bpf/bpf_helpers.h) ausentes. Requer libbpf-dev. Pulando.")
+                return
+
     xdp_source = REPO_ROOT / "ebpf" / "spectre_xdp.c"
     output_obj = REPO_ROOT / "ebpf" / "spectre_xdp_test.o"
 
@@ -192,7 +202,7 @@ def test_ebpf_compilation():
 
 
 def test_rust_loader_compilation():
-    """Valida a compilação do loader em Rust se estiver no Linux com Cargo instalado."""
+    """Valida a compilação do loader em Rust se estiver no Linux com Cargo e LibTorch instalados."""
     cargo = shutil.which("cargo")
     if not cargo:
         if pytest:
@@ -206,6 +216,16 @@ def test_rust_loader_compilation():
             pytest.skip("Compilação nativa de libbpf-sys requer ambiente Linux")
         else:
             print("  [AVISO] Compilação nativa de libbpf-sys requer Linux. Pulando no Windows.")
+            return
+
+    # Validação do LibTorch (obrigatório para compilação do crate tch)
+    libtorch_env = os.environ.get("LIBTORCH")
+    libtorch_local = REPO_ROOT / "libtorch"
+    if not libtorch_env and not libtorch_local.exists():
+        if pytest:
+            pytest.skip("LIBTORCH não configurado no ambiente. O crate tch requer LibTorch C++ pré-instalado.")
+        else:
+            print("  [AVISO] LIBTORCH não configurado. Pulando cargo check de loader_fusion_rs.")
             return
 
     cmd = ["cargo", "check", "--manifest-path", str(REPO_ROOT / "loader_fusion_rs" / "Cargo.toml")]

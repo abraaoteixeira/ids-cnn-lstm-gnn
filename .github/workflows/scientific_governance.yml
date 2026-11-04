@@ -50,6 +50,10 @@ jobs:
         run: |
           pytest tests/test_leakage_free_pipeline.py -v
 
+      - name: Run End-to-End Pipeline & Architecture Tests
+        run: |
+          pytest tests/test_pipeline.py -v
+
       - name: Verify ADR, Skill, and Governance Persistence Integrity
         run: |
           python tools/verify_governance_persistence.py
