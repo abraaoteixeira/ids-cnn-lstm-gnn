@@ -1,0 +1,422 @@
+{
+  "evaluation_title": "Avaliação Independente em Captura Externa Contendo Ataques (UNSW-NB15_2.csv)",
+  "protocol": "Zero-Leakage Frozen Evaluation (refitted_on_external = False)",
+  "source_dataset": "UNSW-NB15_2.csv",
+  "dataset_sha256": "6130ad02873cc6069ae695cf2844f2e8c2e9a9a1b7532dd82ab8f202757cacf8",
+  "slice_range": "400000..600000",
+  "slice_rows": 200000,
+  "slice_attack_flows": 32550,
+  "slice_attack_flow_rate": 0.16275,
+  "num_snapshots_30s": 226,
+  "snapshot_summary": {
+    "num_snapshots": 226,
+    "total_nodes": 8598,
+    "avg_nodes_per_snapshot": 38.04,
+    "min_nodes": 25,
+    "max_nodes": 43,
+    "total_edges": 28175,
+    "self_loops": 209,
+    "cross_host_edges": 27966,
+    "benign_nodes_0": 7699,
+    "attack_nodes_1": 899,
+    "positive_rate": 0.104559,
+    "snapshots_with_both_classes": 226
+  },
+  "reference_bundle_used": "data/processed/unsw_full_ebpf_30s.pt",
+  "refitted_on_external": false,
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+  "torch_version": "2.11.0+cu126",
+  "results_by_variant": {
+    "cnn_lstm_pure": {
+      "seed_42": {
+        "checkpoint": "data\\processed\\g15_cnn_lstm_pure_seed42_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.905559,
+          "precision": 0.528046,
+          "recall": 0.911012,
+          "f1_score": 0.668571,
+          "fpr": 0.095077,
+          "confusion_matrix": {
+            "tn": 6967,
+            "fp": 732,
+            "fn": 80,
+            "tp": 819
+          }
+        },
+        "latency": {
+          "total_eval_ms": 758.7219,
+          "ms_per_snapshot": 3.3572,
+          "us_per_node": 88.244
+        }
+      },
+      "seed_123": {
+        "checkpoint": "data\\processed\\g15_cnn_lstm_pure_seed123_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.915794,
+          "precision": 0.562904,
+          "recall": 0.870968,
+          "f1_score": 0.683843,
+          "fpr": 0.078971,
+          "confusion_matrix": {
+            "tn": 7091,
+            "fp": 608,
+            "fn": 116,
+            "tp": 783
+          }
+        },
+        "latency": {
+          "total_eval_ms": 225.226,
+          "ms_per_snapshot": 0.9966,
+          "us_per_node": 26.1952
+        }
+      },
+      "seed_1337": {
+        "checkpoint": "data\\processed\\g15_cnn_lstm_pure_seed1337_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.910212,
+          "precision": 0.542081,
+          "recall": 0.9099,
+          "f1_score": 0.679402,
+          "fpr": 0.089752,
+          "confusion_matrix": {
+            "tn": 7008,
+            "fp": 691,
+            "fn": 81,
+            "tp": 818
+          }
+        },
+        "latency": {
+          "total_eval_ms": 211.6708,
+          "ms_per_snapshot": 0.9366,
+          "us_per_node": 24.6186
+        }
+      }
+    },
+    "gat_self_loop": {
+      "seed_42": {
+        "checkpoint": "data\\processed\\g15_gat_self_loop_seed42_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.89672,
+          "precision": 0.503343,
+          "recall": 0.921023,
+          "f1_score": 0.650943,
+          "fpr": 0.106118,
+          "confusion_matrix": {
+            "tn": 6882,
+            "fp": 817,
+            "fn": 71,
+            "tp": 828
+          }
+        },
+        "latency": {
+          "total_eval_ms": 407.5179,
+          "ms_per_snapshot": 1.8032,
+          "us_per_node": 47.3968
+        }
+      },
+      "seed_123": {
+        "checkpoint": "data\\processed\\g15_gat_self_loop_seed123_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.920214,
+          "precision": 0.577794,
+          "recall": 0.879867,
+          "f1_score": 0.697531,
+          "fpr": 0.075075,
+          "confusion_matrix": {
+            "tn": 7121,
+            "fp": 578,
+            "fn": 108,
+            "tp": 791
+          }
+        },
+        "latency": {
+          "total_eval_ms": 341.3716,
+          "ms_per_snapshot": 1.5105,
+          "us_per_node": 39.7036
+        }
+      },
+      "seed_1337": {
+        "checkpoint": "data\\processed\\g15_gat_self_loop_seed1337_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.910561,
+          "precision": 0.542318,
+          "recall": 0.926585,
+          "f1_score": 0.684189,
+          "fpr": 0.091311,
+          "confusion_matrix": {
+            "tn": 6996,
+            "fp": 703,
+            "fn": 66,
+            "tp": 833
+          }
+        },
+        "latency": {
+          "total_eval_ms": 384.9967,
+          "ms_per_snapshot": 1.7035,
+          "us_per_node": 44.7775
+        }
+      }
+    },
+    "cnn_lstm_gat": {
+      "seed_42": {
+        "checkpoint": "data\\processed\\g15_cnn_lstm_gat_seed42_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.971156,
+          "precision": 0.79457,
+          "recall": 0.976641,
+          "f1_score": 0.876248,
+          "fpr": 0.029484,
+          "confusion_matrix": {
+            "tn": 7472,
+            "fp": 227,
+            "fn": 21,
+            "tp": 878
+          }
+        },
+        "latency": {
+          "total_eval_ms": 439.524,
+          "ms_per_snapshot": 1.9448,
+          "us_per_node": 51.1193
+        }
+      },
+      "seed_123": {
+        "checkpoint": "data\\processed\\g15_cnn_lstm_gat_seed123_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.96976,
+          "precision": 0.782493,
+          "recall": 0.984427,
+          "f1_score": 0.871921,
+          "fpr": 0.031952,
+          "confusion_matrix": {
+            "tn": 7453,
+            "fp": 246,
+            "fn": 14,
+            "tp": 885
+          }
+        },
+        "latency": {
+          "total_eval_ms": 336.4557,
+          "ms_per_snapshot": 1.4887,
+          "us_per_node": 39.1319
+        }
+      },
+      "seed_1337": {
+        "checkpoint": "data\\processed\\g15_cnn_lstm_gat_seed1337_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.970109,
+          "precision": 0.790235,
+          "recall": 0.972191,
+          "f1_score": 0.87182,
+          "fpr": 0.030134,
+          "confusion_matrix": {
+            "tn": 7467,
+            "fp": 232,
+            "fn": 25,
+            "tp": 874
+          }
+        },
+        "latency": {
+          "total_eval_ms": 335.9366,
+          "ms_per_snapshot": 1.4864,
+          "us_per_node": 39.0715
+        }
+      }
+    },
+    "gat_reverse": {
+      "seed_42": {
+        "checkpoint": "data\\processed\\g15_gat_reverse_seed42_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.916725,
+          "precision": 0.55907,
+          "recall": 0.963293,
+          "f1_score": 0.707516,
+          "fpr": 0.088713,
+          "confusion_matrix": {
+            "tn": 7016,
+            "fp": 683,
+            "fn": 33,
+            "tp": 866
+          }
+        },
+        "latency": {
+          "total_eval_ms": 295.4421,
+          "ms_per_snapshot": 1.3073,
+          "us_per_node": 34.3617
+        }
+      },
+      "seed_123": {
+        "checkpoint": "data\\processed\\g15_gat_reverse_seed123_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.993254,
+          "precision": 0.957563,
+          "recall": 0.978865,
+          "f1_score": 0.968097,
+          "fpr": 0.005066,
+          "confusion_matrix": {
+            "tn": 7660,
+            "fp": 39,
+            "fn": 19,
+            "tp": 880
+          }
+        },
+        "latency": {
+          "total_eval_ms": 306.074,
+          "ms_per_snapshot": 1.3543,
+          "us_per_node": 35.5983
+        }
+      },
+      "seed_1337": {
+        "checkpoint": "data\\processed\\g15_gat_reverse_seed1337_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.994301,
+          "precision": 0.980769,
+          "recall": 0.964405,
+          "f1_score": 0.972518,
+          "fpr": 0.002208,
+          "confusion_matrix": {
+            "tn": 7682,
+            "fp": 17,
+            "fn": 32,
+            "tp": 867
+          }
+        },
+        "latency": {
+          "total_eval_ms": 296.5178,
+          "ms_per_snapshot": 1.312,
+          "us_per_node": 34.4868
+        }
+      }
+    },
+    "gat_bidir": {
+      "seed_42": {
+        "checkpoint": "data\\processed\\g15_gat_bidir_seed42_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.980809,
+          "precision": 0.864087,
+          "recall": 0.968854,
+          "f1_score": 0.913477,
+          "fpr": 0.017795,
+          "confusion_matrix": {
+            "tn": 7562,
+            "fp": 137,
+            "fn": 28,
+            "tp": 871
+          }
+        },
+        "latency": {
+          "total_eval_ms": 375.4906,
+          "ms_per_snapshot": 1.6615,
+          "us_per_node": 43.6719
+        }
+      },
+      "seed_123": {
+        "checkpoint": "data\\processed\\g15_gat_bidir_seed123_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.98616,
+          "precision": 0.907098,
+          "recall": 0.96663,
+          "f1_score": 0.935918,
+          "fpr": 0.01156,
+          "confusion_matrix": {
+            "tn": 7610,
+            "fp": 89,
+            "fn": 30,
+            "tp": 869
+          }
+        },
+        "latency": {
+          "total_eval_ms": 377.7641,
+          "ms_per_snapshot": 1.6715,
+          "us_per_node": 43.9363
+        }
+      },
+      "seed_1337": {
+        "checkpoint": "data\\processed\\g15_gat_bidir_seed1337_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.978716,
+          "precision": 0.880042,
+          "recall": 0.922136,
+          "f1_score": 0.900598,
+          "fpr": 0.014677,
+          "confusion_matrix": {
+            "tn": 7586,
+            "fp": 113,
+            "fn": 70,
+            "tp": 829
+          }
+        },
+        "latency": {
+          "total_eval_ms": 362.0931,
+          "ms_per_snapshot": 1.6022,
+          "us_per_node": 42.1136
+        }
+      }
+    },
+    "gat_residual": {
+      "seed_42": {
+        "checkpoint": "data\\processed\\g15_gat_residual_seed42_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.961735,
+          "precision": 0.735149,
+          "recall": 0.991101,
+          "f1_score": 0.84415,
+          "fpr": 0.041694,
+          "confusion_matrix": {
+            "tn": 7378,
+            "fp": 321,
+            "fn": 8,
+            "tp": 891
+          }
+        },
+        "latency": {
+          "total_eval_ms": 538.1476,
+          "ms_per_snapshot": 2.3812,
+          "us_per_node": 62.5899
+        }
+      },
+      "seed_123": {
+        "checkpoint": "data\\processed\\g15_gat_residual_seed123_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.971505,
+          "precision": 0.790925,
+          "recall": 0.988877,
+          "f1_score": 0.878893,
+          "fpr": 0.030523,
+          "confusion_matrix": {
+            "tn": 7464,
+            "fp": 235,
+            "fn": 10,
+            "tp": 889
+          }
+        },
+        "latency": {
+          "total_eval_ms": 401.0695,
+          "ms_per_snapshot": 1.7746,
+          "us_per_node": 46.6468
+        }
+      },
+      "seed_1337": {
+        "checkpoint": "data\\processed\\g15_gat_residual_seed1337_30s_best.pth",
+        "metrics": {
+          "accuracy": 0.965457,
+          "precision": 0.755085,
+          "recall": 0.991101,
+          "f1_score": 0.857143,
+          "fpr": 0.037537,
+          "confusion_matrix": {
+            "tn": 7410,
+            "fp": 289,
+            "fn": 8,
+            "tp": 891
+          }
+        },
+        "latency": {
+          "total_eval_ms": 470.2698,
+          "ms_per_snapshot": 2.0808,
+          "us_per_node": 54.6953
+        }
+      }
+    }
+  }
+}

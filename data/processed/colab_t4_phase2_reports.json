@@ -1,0 +1,167 @@
+{
+  "environment": {
+    "platform": "Google Colab Pro",
+    "gpu_name": "NVIDIA Tesla T4",
+    "gpu_memory_gib": 14.56,
+    "python_version": "3.13.16",
+    "torch_version": "2.11.0+cu130",
+    "pyg_version": "2.8.1",
+    "git_commit": "d41c719928"
+  },
+  "dataset_summary": {
+    "source": "UNSW-NB15.csv (Git LFS)",
+    "sha256": "7d851bbeabd27894ce39c8e78835c73341fc946652fb7743b9eff193b55eb511",
+    "active_horizon_rows": 200000,
+    "window_sec": 30.0,
+    "feature_scope": "ebpf_compatible",
+    "top_features": [
+      "sttl", "ct_state_ttl", "state_INT", "ct_dst_sport_ltm", "dttl",
+      "tcprtt", "ackdat", "proto_unas", "synack", "ct_src_dport_ltm",
+      "Sload", "dmeansz", "Dload", "state_CON", "dsport",
+      "ct_dst_src_ltm", "ct_srv_src", "proto_tcp", "swin", "dwin"
+    ],
+    "snapshots": {
+      "train": {"num_snapshots": 152, "total_nodes": 5724, "benign_nodes": 5120, "attack_nodes": 604, "total_edges": 19109},
+      "val": {"num_snapshots": 48, "total_nodes": 1793, "benign_nodes": 1601, "attack_nodes": 192, "total_edges": 6057},
+      "test": {"num_snapshots": 56, "total_nodes": 1796, "benign_nodes": 1658, "attack_nodes": 138, "total_edges": 6651}
+    }
+  },
+  "results": {
+    "seed_123": {
+      "cnn_lstm_pure": {
+        "best_epoch": 18,
+        "val_f1": 0.7522,
+        "val_precision": 0.6538,
+        "val_recall": 0.8854,
+        "val_fpr": 0.0562,
+        "confusion_matrix": {"tn": 1511, "fp": 90, "fn": 22, "tp": 170},
+        "latency_ms_per_snapshot": 0.503,
+        "latency_us_per_node": 13.46,
+        "training_time_sec": 4.98
+      },
+      "gat_self_loop": {
+        "best_epoch": 13,
+        "val_f1": 0.7646,
+        "val_precision": 0.6920,
+        "val_recall": 0.8542,
+        "val_fpr": 0.0456,
+        "confusion_matrix": {"tn": 1528, "fp": 73, "fn": 28, "tp": 164},
+        "latency_ms_per_snapshot": 0.622,
+        "latency_us_per_node": 16.64,
+        "training_time_sec": 5.72
+      },
+      "cnn_lstm_gat": {
+        "best_epoch": 29,
+        "val_f1": 0.9287,
+        "val_precision": 0.8791,
+        "val_recall": 0.9844,
+        "val_fpr": 0.0162,
+        "confusion_matrix": {"tn": 1575, "fp": 26, "fn": 3, "tp": 189},
+        "latency_ms_per_snapshot": 0.816,
+        "latency_us_per_node": 21.84,
+        "training_time_sec": 8.44
+      },
+      "gat_reverse": {
+        "best_epoch": 10,
+        "val_f1": 0.9896,
+        "val_precision": 0.9896,
+        "val_recall": 0.9896,
+        "val_fpr": 0.0012,
+        "confusion_matrix": {"tn": 1599, "fp": 2, "fn": 2, "tp": 190},
+        "latency_ms_per_snapshot": 0.490,
+        "latency_us_per_node": 13.13,
+        "training_time_sec": 5.05
+      },
+      "gat_bidir": {
+        "best_epoch": 15,
+        "val_f1": 0.9592,
+        "val_precision": 0.9400,
+        "val_recall": 0.9792,
+        "val_fpr": 0.0075,
+        "confusion_matrix": {"tn": 1589, "fp": 12, "fn": 4, "tp": 188},
+        "latency_ms_per_snapshot": 0.503,
+        "latency_us_per_node": 13.46,
+        "training_time_sec": 6.10
+      },
+      "gat_residual": {
+        "best_epoch": 6,
+        "val_f1": 0.9481,
+        "val_precision": 0.9014,
+        "val_recall": 1.0000,
+        "val_fpr": 0.0131,
+        "confusion_matrix": {"tn": 1580, "fp": 21, "fn": 0, "tp": 192},
+        "latency_ms_per_snapshot": 0.566,
+        "latency_us_per_node": 15.14,
+        "training_time_sec": 4.12
+      }
+    },
+    "seed_1337": {
+      "cnn_lstm_pure": {
+        "best_epoch": 10,
+        "val_f1": 0.7417,
+        "val_precision": 0.6437,
+        "val_recall": 0.8750,
+        "val_fpr": 0.0581,
+        "confusion_matrix": {"tn": 1508, "fp": 93, "fn": 24, "tp": 168},
+        "latency_ms_per_snapshot": 0.344,
+        "latency_us_per_node": 9.22,
+        "training_time_sec": 3.04
+      },
+      "gat_self_loop": {
+        "best_epoch": 18,
+        "val_f1": 0.7554,
+        "val_precision": 0.7059,
+        "val_recall": 0.8125,
+        "val_fpr": 0.0406,
+        "confusion_matrix": {"tn": 1536, "fp": 65, "fn": 36, "tp": 156},
+        "latency_ms_per_snapshot": 0.519,
+        "latency_us_per_node": 13.90,
+        "training_time_sec": 5.70
+      },
+      "cnn_lstm_gat": {
+        "best_epoch": 29,
+        "val_f1": 0.9204,
+        "val_precision": 0.8810,
+        "val_recall": 0.9635,
+        "val_fpr": 0.0156,
+        "confusion_matrix": {"tn": 1576, "fp": 25, "fn": 7, "tp": 185},
+        "latency_ms_per_snapshot": 0.579,
+        "latency_us_per_node": 15.51,
+        "training_time_sec": 7.81
+      },
+      "gat_reverse": {
+        "best_epoch": 9,
+        "val_f1": 0.9545,
+        "val_precision": 0.9265,
+        "val_recall": 0.9844,
+        "val_fpr": 0.0094,
+        "confusion_matrix": {"tn": 1586, "fp": 15, "fn": 3, "tp": 189},
+        "latency_ms_per_snapshot": 0.562,
+        "latency_us_per_node": 15.05,
+        "training_time_sec": 3.93
+      },
+      "gat_bidir": {
+        "best_epoch": 9,
+        "val_f1": 0.9388,
+        "val_precision": 0.9200,
+        "val_recall": 0.9583,
+        "val_fpr": 0.0100,
+        "confusion_matrix": {"tn": 1585, "fp": 16, "fn": 8, "tp": 184},
+        "latency_ms_per_snapshot": 0.505,
+        "latency_us_per_node": 13.51,
+        "training_time_sec": 3.76
+      },
+      "gat_residual": {
+        "best_epoch": 11,
+        "val_f1": 0.9576,
+        "val_precision": 0.9187,
+        "val_recall": 1.0000,
+        "val_fpr": 0.0106,
+        "confusion_matrix": {"tn": 1584, "fp": 17, "fn": 0, "tp": 192},
+        "latency_ms_per_snapshot": 0.579,
+        "latency_us_per_node": 15.49,
+        "training_time_sec": 4.74
+      }
+    }
+  }
+}
