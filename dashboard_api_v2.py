@@ -8,7 +8,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -22,16 +22,20 @@ logger = logging.getLogger("SPECTRE_API_V2")
 
 SOCKET_PATH = "/tmp/spectre.sock"
 DB_PATH = "spectre_history_v2.db"
+DEMO_READ_ONLY = os.getenv("DEMO_READ_ONLY", "true").lower() in ("true", "1", "yes")
 active_connections = set()
 recent_lines = []
 
 # ==============================================================================
 # FILA ASSÍNCRONA DE ALTA PERFORMANCE (Desacoplamento I/O)
 # ==============================================================================
-# Evita que a gravação no disco trave a leitura do Unix Socket (vital para DDoS)
-db_write_queue = asyncio.Queue(maxsize=100000)
+# Instanciada dinamicamente dentro do loop de eventos para máxima portabilidade
+db_write_queue = None
 
 async def init_db():
+    global db_write_queue
+    if db_write_queue is None:
+        db_write_queue = asyncio.Queue(maxsize=100000)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS threat_log (
@@ -45,14 +49,21 @@ async def init_db():
                 is_threat INTEGER,
                 bytes INTEGER,
                 packets INTEGER,
-                attention_weight REAL DEFAULT 0.0
+                attention_weight REAL DEFAULT 0.0,
+                latency_ms REAL DEFAULT NULL
             )
         """)
-        # Safe migration for existing databases
+        # Safe migrations for existing databases
         try:
             await db.execute("ALTER TABLE threat_log ADD COLUMN attention_weight REAL DEFAULT 0.0")
             await db.commit()
-            logger.info("Migração: Coluna 'attention_weight' adicionada com sucesso.")
+            logger.info("Migração: Coluna 'attention_weight' verificada com sucesso.")
+        except sqlite3.OperationalError:
+            pass # Column already exists
+        try:
+            await db.execute("ALTER TABLE threat_log ADD COLUMN latency_ms REAL DEFAULT NULL")
+            await db.commit()
+            logger.info("Migração: Coluna 'latency_ms' verificada com sucesso.")
         except sqlite3.OperationalError:
             pass # Column already exists
         await db.commit()
@@ -76,8 +87,8 @@ async def db_writer_worker():
 
                 # Transação em Lote Otimizada
                 await db.executemany("""
-                    INSERT INTO threat_log (timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets, attention_weight)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO threat_log (timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets, attention_weight, latency_ms)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, items)
                 await db.commit()
 
@@ -89,7 +100,7 @@ async def db_writer_worker():
         logger.error(f"Erro fatal no worker de BD: {e}")
 
 async def handle_unix_client(reader, writer):
-    logger.info("Motor C++ conectado ao Unix Socket (V2 High Performance).")
+    logger.info("Motor / Replay Player conectado ao Socket IPC (V2 High Performance).")
     try:
         while True:
             data = await reader.readline()
@@ -111,7 +122,8 @@ async def handle_unix_client(reader, writer):
                         1 if payload.get("is_threat", False) else 0,
                         payload.get("bytes", 0),
                         payload.get("packets", 0),
-                        payload.get("attention_weight", 0.0)
+                        payload.get("attention_weight", 0.0),
+                        payload.get("latency_ms", None)
                     )
                     
                     # Se a fila estiver cheia, descarta log no BD mas não derruba socket (Backpressure protection)
@@ -128,7 +140,6 @@ async def handle_unix_client(reader, writer):
                     recent_lines.pop(0)
 
                 # Broadcast Async aos WebSockets (Fan-Out)
-                # Removido bloqueio por cliente lento usando asyncio.gather
                 if active_connections:
                     tasks = []
                     for ws in active_connections:
@@ -140,7 +151,7 @@ async def handle_unix_client(reader, writer):
     finally:
         writer.close()
         await writer.wait_closed()
-        logger.info("Motor C++ desconectado do Unix Socket.")
+        logger.info("Motor desconectado do Socket IPC.")
 
 # Variável global para gerenciar a task do DB Writer
 db_worker_task = None
@@ -183,16 +194,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-static_dir = Path(__file__).parent / "dashboard_v2" / "dist"
-if not static_dir.exists():
-    # Fallback para o modo legado caso a build do React não tenha sido executada
-    static_dir = Path(__file__).parent / "static_legacy"
+dist_dir = Path(__file__).parent / "dashboard_v2" / "dist"
+assets_dir = dist_dir / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+elif (Path(__file__).parent / "static_legacy" / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=str(Path(__file__).parent / "static_legacy" / "assets")), name="assets")
 
-app.mount("/assets", StaticFiles(directory=str(Path(__file__).parent / "dashboard_v2" / "dist" / "assets")), name="assets")
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+static_dir = dist_dir if dist_dir.exists() else (Path(__file__).parent / "static_legacy")
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 @app.get("/")
 async def root():
+    index_html = dist_dir / "index.html"
+    if index_html.exists():
+        return FileResponse(str(index_html))
+    legacy_index = Path(__file__).parent / "static_legacy" / "index.html"
+    if legacy_index.exists():
+        return FileResponse(str(legacy_index))
     return RedirectResponse(url="/static/index.html")
 
 @app.get("/api/history")
@@ -200,7 +220,7 @@ async def get_history(limit: int = 50, only_threats: bool = False):
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             db.row_factory = aiosqlite.Row
-            query = "SELECT timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets, attention_weight FROM threat_log"
+            query = "SELECT timestamp, src_ip, dst_ip, port, protocol, probability, is_threat, bytes, packets, attention_weight, latency_ms FROM threat_log"
             if only_threats:
                 query += " WHERE is_threat = 1"
             query += " ORDER BY id DESC LIMIT ?"
@@ -219,6 +239,12 @@ async def get_history(limit: int = 50, only_threats: bool = False):
 
 @app.post("/api/clear_history")
 async def clear_history():
+    if DEMO_READ_ONLY:
+        logger.warning("Tentativa de limpar histórico bloqueada: DEMO_READ_ONLY=True.")
+        return JSONResponse(
+            status_code=403,
+            content={"status": "error", "error": "Operação desabilitada no modo demonstração acadêmica (DEMO_READ_ONLY=true)."}
+        )
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute("DELETE FROM threat_log")
@@ -243,4 +269,6 @@ async def websocket_endpoint(websocket: WebSocket):
         active_connections.remove(websocket)
 
 if __name__ == "__main__":
-    uvicorn.run("dashboard_api_v2:app", host="0.0.0.0", port=8001, reload=True)
+    reload_env = os.getenv("UVICORN_RELOAD", "false").lower() in ("true", "1", "yes")
+    port = int(os.getenv("PORT", "8001"))
+    uvicorn.run("dashboard_api_v2:app", host="0.0.0.0", port=port, reload=reload_env)

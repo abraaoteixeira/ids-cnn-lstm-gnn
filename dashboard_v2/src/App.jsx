@@ -9,7 +9,9 @@ function App() {
   const [stats, setStats] = useState({
     totalBytes: 0,
     packetsAnalyzed: 0,
-    threatsBlocked: 0,
+    threatsDetected: 0,
+    proposedMitigations: 0,
+    kernelDrops: 0,
     activeConnections: 0
   });
   
@@ -59,7 +61,7 @@ function App() {
     lastAttentionWeight: 0,
     lastAttentionIp: 'Nenhum',
     lastProbability: 0,
-    inferenceLatency: 1.2
+    inferenceLatency: null
   });
   
   const totalBytesRef = useRef(0);
@@ -99,7 +101,7 @@ function App() {
 
   useEffect(() => {
     // Carregar histórico inicial do Banco de Dados
-    fetch('http://localhost:8001/api/history?limit=100')
+    fetch('/api/history?limit=100')
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -165,30 +167,36 @@ function App() {
 
           if (data.length > 0) {
             const latest = data[0];
+            const parsedLatency = (latest.latency_ms !== undefined && latest.latency_ms !== null) ? Number(latest.latency_ms) : null;
             setModelDiagnostics({
               lastAttentionWeight: latest.attention_weight !== undefined ? latest.attention_weight * 100 : (latest.probability ? latest.probability * 0.9 : 0),
               lastAttentionIp: latest.src_ip ? latest.src_ip.split(' ')[0] : 'Nenhum',
               lastProbability: latest.probability || 0,
-              inferenceLatency: 1.15
+              inferenceLatency: parsedLatency
             });
           }
 
           // Computar stats iniciais baseados no histórico
           const totalBytes = data.reduce((acc, item) => acc + (item.bytes || 0), 0);
-          const threatsBlocked = data.filter(item => item.is_threat).length;
+          const threatsDetected = data.filter(item => item.is_threat).length;
           setStats(prev => ({
             ...prev,
             totalBytes,
             packetsAnalyzed: data.length,
-            threatsBlocked,
+            threatsDetected,
+            proposedMitigations: threatsDetected,
+            kernelDrops: 0,
             activeConnections: nodesMap.current.size
           }));
         }
       })
       .catch(err => console.error("Erro ao carregar histórico inicial:", err));
 
-    // Conectar WebSocket
-    const ws = new WebSocket('ws://localhost:8001/ws/threats');
+    // Conectar WebSocket dinâmico (compatível com proxies, túneis e HTTPS)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host || 'localhost:8001';
+    const wsUrl = `${protocol}//${host}/ws/threats`;
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
@@ -203,11 +211,16 @@ function App() {
           return newLogs;
         });
 
-        // Atualiza Stats em tempo real
+        const isThreat = !!data.is_threat;
+        const kernelDropCount = Number(data.kernel_drop || 0);
+
+        // Atualiza Stats em tempo real com separação honesta de métricas
         setStats(prev => ({
           totalBytes: prev.totalBytes + (data.bytes || 0),
           packetsAnalyzed: prev.packetsAnalyzed + 1,
-          threatsBlocked: prev.threatsBlocked + (data.is_threat ? 1 : 0),
+          threatsDetected: prev.threatsDetected + (isThreat ? 1 : 0),
+          proposedMitigations: prev.proposedMitigations + (isThreat ? 1 : 0),
+          kernelDrops: prev.kernelDrops + kernelDropCount,
           activeConnections: nodesMap.current.size
         }));
 
@@ -216,13 +229,16 @@ function App() {
         const probability = (data.probability || 0) * 100;
         const srcIp = data.src_ip || 'Unknown';
         const cleanIp = srcIp.split(' ')[0];
+        const measuredLatency = (data.latency_ms !== undefined && data.latency_ms !== null)
+          ? Number(data.latency_ms)
+          : null;
 
-        // Atualiza diagnósticos de IA com dados reais do pacote e latência simulada
+        // Atualiza diagnósticos de IA com dados instrumentados reais
         setModelDiagnostics(prev => ({
           lastAttentionWeight: attention,
           lastAttentionIp: cleanIp,
           lastProbability: probability,
-          inferenceLatency: parseFloat((0.9 + Math.random() * 0.6).toFixed(2)) // Simula latência realística do pipeline (0.9ms - 1.5ms)
+          inferenceLatency: measuredLatency
         }));
 
         setTrafficData(prev => {
@@ -380,12 +396,16 @@ function App() {
     };
   }, [selectedNode, logs]);
 
-  // Limpar Banco de Dados
+  // Limpar Banco de Dados (com proteção em modo demonstração)
   const handleClearHistory = async () => {
     if (window.confirm("Deseja realmente limpar todo o histórico de ameaças e logs do banco de dados?")) {
       try {
-        const response = await fetch('http://localhost:8001/api/clear_history', { method: 'POST' });
+        const response = await fetch('/api/clear_history', { method: 'POST' });
         const result = await response.json();
+        if (response.status === 403 || result.status === 'error') {
+          addToast(result.error || "Operação desabilitada no modo demonstração acadêmica (DEMO_READ_ONLY=true).", "warning");
+          return;
+        }
         if (result.status === 'success') {
           setLogs([]);
           nodesMap.current.clear();
@@ -394,7 +414,9 @@ function App() {
           setStats({
             totalBytes: 0,
             packetsAnalyzed: 0,
-            threatsBlocked: 0,
+            threatsDetected: 0,
+            proposedMitigations: 0,
+            kernelDrops: 0,
             activeConnections: 0
           });
           setSelectedNode(null);
@@ -465,6 +487,12 @@ function App() {
         </div>
       </header>
 
+      {/* Academic Replay Banner */}
+      <div className="academic-replay-banner">
+        <span className="banner-tag">MODO ACADÊMICO</span>
+        <span className="banner-text">ACADEMIC REPLAY — INFERÊNCIA REAL SOBRE TRÁFEGO HISTÓRICO, SEM CAPTURA OU MITIGAÇÃO AO VIVO</span>
+      </div>
+
       {/* Main Content Area */}
       <main className="main-content">
         
@@ -478,17 +506,26 @@ function App() {
             </div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-title"><Network size={16} /> Pacotes Analisados</div>
+            <div className="kpi-title"><Network size={16} /> Fluxos / Pacotes</div>
             <div className="kpi-value">{stats.packetsAnalyzed.toLocaleString()}</div>
             <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
               Inferências GNN Ativas
             </div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-title"><AlertTriangle size={16} /> Ameaças Bloqueadas</div>
-            <div className="kpi-value danger">{stats.threatsBlocked.toLocaleString()}</div>
+            <div className="kpi-title"><AlertTriangle size={16} /> Ameaças Detectadas (STGNN)</div>
+            <div className="kpi-value danger">{stats.threatsDetected.toLocaleString()}</div>
             <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--accent-red)', fontWeight: 500, marginTop: '4px' }}>
-              Mitigação eBPF XDP_DROP
+              Classificação Neural Causal
+            </div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-title"><Shield size={16} /> Mitigação eBPF XDP_DROP</div>
+            <div className="kpi-value" style={{ fontSize: stats.kernelDrops > 0 ? '1.8rem' : '1.15rem', color: stats.kernelDrops > 0 ? 'var(--accent-red)' : 'var(--text-secondary)' }}>
+              {stats.kernelDrops > 0 ? stats.kernelDrops.toLocaleString() : "0 (Replay — Sem Kernel)"}
+            </div>
+            <div className="kpi-subtext" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Descarte Físico no Kernel
             </div>
           </div>
           <div className="kpi-card">
@@ -575,8 +612,12 @@ function App() {
                     
                     <div className="hud-metric-row">
                       <div className="hud-metric-item">
-                        <span className="hud-label">Latência GNN</span>
-                        <span className="hud-value mono">{modelDiagnostics.inferenceLatency.toFixed(2)} ms</span>
+                        <span className="hud-label">Latência STGNN</span>
+                        <span className="hud-value mono">
+                          {modelDiagnostics.inferenceLatency !== null 
+                            ? `${modelDiagnostics.inferenceLatency.toFixed(2)} ms` 
+                            : 'NÃO MEDIDO'}
+                        </span>
                       </div>
                       <div className="hud-metric-item">
                         <span className="hud-label">Acurácia STGNN</span>

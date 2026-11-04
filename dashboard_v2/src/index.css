@@ -83,6 +83,37 @@ body {
   border-radius: 50%;
 }
 
+/* Academic Replay Banner */
+.academic-replay-banner {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2) 0%, rgba(15, 23, 42, 0.8) 50%, rgba(16, 185, 129, 0.2) 100%);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.4);
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 0.78rem;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: #bfdbfe;
+  text-align: center;
+}
+
+.academic-replay-banner .banner-tag {
+  background: #2563eb;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+}
+
+.academic-replay-banner .banner-text {
+  font-family: var(--font-mono);
+}
+
 /* Main Content */
 .main-content {
   flex: 1;
@@ -96,7 +127,7 @@ body {
 /* KPI Cards */
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 20px;
 }
 

@@ -17,18 +17,22 @@ O objetivo desta nova fase é **transformar os artefatos experimentais validados
 ### Princípios Inegociáveis da Demonstração:
 1. **Verdade Científica e Transparência Ontológica:** Não caracterizar tráfego reproduzido ou injetado como se fosse captura física ao vivo; não afirmar descarte de pacotes no kernel (*line-rate drop*) quando o ambiente operacional não estiver instrumentado fisicamente em hardware de rede.
 2. **Separação Categórica de Modos:** Diferenciação formal e visual na interface entre o **Modo A (Academic Replay)** e o **Modo B (Experimental Live)**.
-3. **Acessibilidade Universal e Custo Zero:** Priorização estrita de plataformas gratuitas permanentes e infraestrutura científica institucional, sem consumo de créditos, contratação de servidores comerciais ou exposição insegura de portas.
+3. **Acessibilidade Universal e Rigor de Infraestrutura:** Avaliação realista das opções de hospedagem, diferenciando plataformas estáticas gratuitas, requisitos de faturamento para contêineres dinâmicos, doações acadêmicas (grants), infraestrutura institucional e túneis efêmeros locais.
 
 ---
 
 ## 2. Estudo de Viabilidade de Infraestrutura e Plataformas de Hospedagem
 
-| Plataforma / Ambiente | Modelo de Custo | Requisitos de Hardware | Suporte ao Modo A (Replay) | Suporte ao Modo B (Live) | Veredito Estratégico |
+Com base na documentação oficial atual do ecossistema de computação (em particular [Hugging Face Spaces Overview](https://huggingface.co/docs/hub/spaces-overview)), a viabilidade de cada ambiente é classificada abaixo:
+
+| Plataforma / Ambiente | Modelo de Custo & Requisitos de Acesso | Requisitos de Hardware | Suporte ao Modo A (Replay) | Suporte ao Modo B (Live) | Veredito Estratégico |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **Hugging Face Spaces (Docker Space)** | **Gratuito Permanente** (sem cartão de crédito) | 2 vCPUs, 16 GB RAM, 50 GB disco efêmero | **100% Compatível (Ideal)** | **Incompatível** (sem kernel/XDP) | **Caminho Principal Recomendado para Avaliadores Externos:** Permite hospedar a API FastAPI + React compilado com inferência PyTorch real em CPU para o mundo via HTTPS. |
-| **Infraestrutura Institucional (IFC Brusque / RNP)** | **Gratuito Institucional** (solicitação interna) | Servidor Linux bare-metal ou VM KVM com NIC física | **100% Compatível** | **100% Compatível** (sob agendamento) | **Ambiente Recomendado para Validação com Orientador:** Permite ensaios do Modo B com privilégios de kernel (`CAP_BPF`, `CAP_NET_ADMIN`) e acoplamento do XDP. |
-| **Host Local + Túnel Seguro (Cloudflare Tunnel)** | **Gratuito** (instalação pontual de `cloudflared`) | Dell G15 (RTX 3050) ou estação local | **100% Compatível** | **Parcialmente Compatível** (WSL2 veth / loopback) | **Solução de Contingência para Reuniões Síncronas:** Gera URL temporária HTTPS (`*.trycloudflare.com`) sem abrir portas no roteador durante a apresentação da banca. |
-| **Testbeds Científicos Internacionais (Chameleon / CloudLab)** | **Gratuito para Pesquisa** (requer projeto aprovado) | Servidores de rede de ponta com SmartNICs (100G) | **Compatível** | **100% Compatível (Nível 5)** | **Mapeado como Trabalho Futuro:** Plataforma para ensaios de saturação de taxa de linha em periódico (IEEE TNSM). |
+| **Hugging Face Static Spaces** | **Gratuito e Público** (sem cartão de crédito) | Recursos de CDN estático (HTML/JS/WASM) | **Incompatível** (sem backend Python/PyTorch) | **Incompatível** (sem kernel/XDP) | **Apenas Frontend Estático:** Permite hospedar telas HTML/JS compiladas, mas é incapaz de executar inferência PyTorch ou manter websockets dinâmicos sem servidor externo. |
+| **Hugging Face Docker / Gradio Spaces** | **Exige Verificação de Faturamento / Assinatura** (conforme política atual da HF para instanciar contêineres e alocar hardware CPU Basic) | 2 vCPUs, 16 GB RAM, 50 GB disco efêmero | **100% Compatível** (caso conta verificada) | **Incompatível** (sem kernel Linux/XDP nativo) | **Viabilidade Condicional:** A criação de novos Docker Spaces requer conta com verificação de método de pagamento ou subscrição ativa. Não deve ser anunciada como '100% gratuita permanente sem cartão'. |
+| **Hugging Face Community Grants** | **Gratuito sob Concessão Acadêmica** (mediante formulário de submissão e aprovação manual por comitê da HF) | Instâncias de CPU ou GPU para pesquisa aberta | **100% Compatível** | **Incompatível** (sem kernel/XDP) | **Alternativa para Manuscrito/Paper:** Excelente para submissão formal de pesquisa aberta, porém sem garantia imediata de ativação para testes locais prévios. |
+| **Infraestrutura Institucional (IFC Brusque / RNP)** | **Gratuito Institucional** (requer projeto e aprovação administrativa prévia) | Servidor Linux bare-metal ou VM KVM com interface de rede física | **100% Compatível** | **100% Compatível** (sob agendamento) | **Ambiente Recomendado para Validação com Orientador:** Ambiente controlado e definitivo para ensaios do Modo B com privilégios de kernel (`CAP_BPF`, `CAP_NET_ADMIN`) e acoplamento do XDP. |
+| **Host Local + Túnel Seguro (Cloudflare Tunnel / ngrok)** | **100% Gratuito e Imediato** (instalação pontual de `cloudflared`) | Dell G15 ou estação de trabalho local com Python/Node | **100% Compatível** | **Parcialmente Compatível** (WSL2 veth / loopback) | **Solução Ideal para Apresentações Síncronas (Banca/Reuniões):** Gera URL temporária e segura via HTTPS (`*.trycloudflare.com`) durante a sessão de avaliação sem expor portas no roteador, mas dependente da máquina local ligada (não é hospedagem web 24/7 permanente). |
+| **Testbeds Científicos Internacionais (Chameleon / CloudLab)** | **Gratuito para Pesquisa** (requer projeto aprovado) | Servidores bare-metal com SmartNICs (100G) | **Compatível** | **100% Compatível (Nível 5)** | **Mapeado como Trabalho Futuro:** Plataforma para ensaios de saturação de taxa de linha em periódico (IEEE TNSM). |
 
 ---
 
@@ -130,21 +134,22 @@ Tempo estimado total: **12 a 15 minutos**.
 ```
 
 ### Passo 1: Abertura e Estabilidade Operacional em Repouso (00:00 - 03:00)
-- **Ação:** Abrir a dashboard no navegador (via Hugging Face Spaces ou localhost/túnel);
-- **Evidência Visual:** Apontar para o banner no topo confirmando o *Modo Replay Acadêmico sobre Dados Auditados*;
-- **Demonstração:** Executar a reprodução da cauda benigna (667 snapshots, 15.900 nós). Mostrar no contador e no gráfico que a rede mantém tráfego constante de controle (DNS, HTTP normal) sem emitir falsos alarmes descontrolados (FPR estável em **$0,57\%$**, com **91 FPs em 15.809 nós benignos**);
-- **Argumento:** *"O SPECTRE-GRID não sofre da falha comum de NIDS baseados em Deep Learning, que inundam os operadores de SOC com alertas falsos em períodos sem ataque."*
+- **Ação:** Abrir a dashboard no navegador (via host local ou túnel seguro);
+- **Evidência Visual:** Apontar para o banner no topo confirmando:  
+  `ACADEMIC REPLAY — INFERÊNCIA REAL SOBRE TRÁFEGO HISTÓRICO, SEM CAPTURA OU MITIGAÇÃO AO VIVO`;
+- **Demonstração:** Executar a reprodução da cauda benigna auditada (667 snapshots temporais, 15.900 nós). Mostrar nos contadores e gráficos que o classificador opera em regime de repouso com baixa taxa de falsos positivos (FPR canônico de **$0,5723\%$**, correspondendo a exatamente **91 falsos positivos em 15.900 nós benignos**, com **15.809 verdadeiros negativos**). Deixar explícito que não se trata de ausência absoluta de falsos positivos, mas de uma taxa de falso alarme operacionalmente contida;
+- **Argumento:** *"O SPECTRE-GRID demonstra estabilidade em tráfego puramente benigno, evitando o disparo massivo de alertas espúrios que tipicamente sobrecarregam operadores de SOC."*
 
 ### Passo 2: Detecção de Campanha Ativa e Mudança de Distribuição (03:00 - 07:00)
 - **Ação:** Iniciar o recorte de linhas 400.000..600.000 de `UNSW-NB15_2.csv` (campanha real com 32.550 ataques);
-- **Evidência Visual:** Observar na topologia 3D os nós atacantes tornando-se vermelhos instantaneamente, com atenção neural $p \ge 90\%$;
-- **Demonstração:** Clicar em um nó malicioso (ex.: `185.220.101.5` ou `45.89.23.12`) e exibir o painel lateral com volume de bytes, fluxos relacionados e o escore de atenção gerado pela inferência em tempo real;
+- **Evidência Visual:** Observar na topologia gráfica os nós atacantes reais identificados em vermelho, com escore de atenção e probabilidade neural emitida pelo modelo;
+- **Demonstração:** Clicar em um nó agressor real do dataset (ex.: `175.45.176.0` ou `175.45.176.2`, endereços confirmados do pool de ataque do UNSW-NB15) e exibir no painel lateral o volume de bytes, os fluxos correlacionados e a probabilidade calculada pela STGNN;
 - **Argumento:** *"Mesmo sob severo concept drift temporal em uma captura de rede independente, a camada GAT bidirecional preserva F1 de $0,9167$, enquanto modelos sem grafo colapsam para $0,6773$."*
 
 ### Passo 3: O Ponto Crítico da Tese — Proteção de Vítimas Passivas (07:00 - 10:00)
-- **Ação:** Selecionar um nó benigno da rede interna (ex.: `192.168.100.1` ou `172.16.0.1`) que está recebendo múltiplos ataques direcionados;
-- **Evidência Visual:** Mostrar que o nó da vítima permanece verde (*PERMITIDO*, atenção residual $< 35\%$), enquanto apenas o nó agressor de origem recebe o rótulo de bloqueio;
-- **Argumento Científico:** *"Aqui comprovamos empiricamente a tese central do SPECTRE-GRID: ao adotar rotulagem causal restrita à origem ($srcip$) combinada com passagem de mensagens bidirecional, evitamos que alvos benignos sofram contaminação de vizinhança. Em modelos direcionados tradicionais, o FPR dessas vítimas saltava para $6,51\%$; no SPECTRE-GRID, o nó protegido não é bloqueado indevidamente."*
+- **Ação:** Selecionar um nó servidor/vítima passiva da rede interna (ex.: `149.171.126.1` ou `10.40.182.1`) que está recebendo múltiplos ataques direcionados na janela temporal;
+- **Evidência Visual:** Mostrar que o nó da vítima permanece classificado como seguro/permitido (rótulo $y=0$, atenção de agressão contida), enquanto apenas o nó de origem malicioso recebe proposição de bloqueio;
+- **Argumento Científico:** *"Aqui comprovamos empiricamente a tese central do SPECTRE-GRID: ao adotar rotulagem causal restrita à origem ($srcip$) combinada com passagem de mensagens bidirecional, evitamos que alvos benignos sofram contaminação de vizinhança. Em modelos direcionados tradicionais, o FPR dessas vítimas saltava para $6,51\%$; no SPECTRE-GRID com GAT bidirecional, o nó protegido permanece livre de bloqueio indevido."*
 
 ### Passo 4: Transparência Metodológica e Código do Sensor (10:00 - 13:00)
 - **Ação:** Apresentar a separação ontológica entre a inferência neural da dashboard e o código do driver eBPF (`spectre_xdp.c`);

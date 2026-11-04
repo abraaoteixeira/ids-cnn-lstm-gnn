@@ -103,3 +103,17 @@ Este documento registra formalmente as decisões de projeto, metodologia cientí
   4. Instituir a governança permanente com auditoria automatizada em CI.
 - **Evidência:** Relatórios de execução nos dois nós de hardware (`g15_*` e `colab_*`) apresentaram exatamente o mesmo ranking de 6 arquiteturas, provando que as conclusões científicas são independentes da plataforma de aceleração.
 - **Impacto:** Rastreabilidade e conformidade total com os padrões éticos e metodológicos do IEEE/IFIP.
+
+---
+
+### ADR-009: Arquitetura Dual-Mode da Demonstração Acadêmica e Separação Categórica de Métricas
+- **Data:** 2026-11-04
+- **Status:** VIGENTE
+- **Contexto:** A apresentação acadêmica para orientador, bancas examinadoras e revisores de conferências internacionais demanda demonstração funcional de inferência neural em tempo de execução sem incorrer em fabricação de dados, latência fictícia ou confusão ontológica entre classificação neural e descarte físico no kernel.
+- **Decisão:**
+  1. Estabelecer formalmente o Modo A (Academic Replay) baseado em inferência neural real em PyTorch sobre snapshots temporais auditados do UNSW-NB15 (`tools/academic_replay_player.py`), com medição real de latência via `time.perf_counter()` em milissegundos e preservação de rótulos de verdade de base separadamente das predições para auditoria contínua;
+  2. Proibir categoricamente em interfaces de usuário a exibição de contadores enganosos de descarte no kernel (`XDP_DROP`) ou latências artificiais geradas por funções randômicas (`Math.random()`) quando em Modo Replay, exigindo contadores separados e honestos (Ameaças Detectadas pela STGNN vs Mitigação Proposta pela Política vs Descarte Físico Confirmado no Kernel);
+  3. Habilitar proteção de escrita na API em modo de demonstração via variável de ambiente (`DEMO_READ_ONLY=true`), bloqueando requisições destrutivas com HTTP 403 Forbidden;
+  4. Manter a proposta da nova Figura 1 vetorial em diretório e arquivos de proposta isolados (`paper/noms2027/figures/proposals/fig1_spectre_architecture_v2.svg` e `.pdf`), distinguindo graficamente os 3 planos: Data Plane (Kernel), Neural Inference Core (Userspace) e Presentation & Closed-Loop Control, preservando intacta a figura original do artigo até deliberação e homologação formal.
+- **Evidência:** O player de replay acadêmico (`tools/academic_replay_player.py`) comprovou inferência neural real em CPU com latência mensurada (média de ~3.8 a 15 ms por snapshot) e separação honesta nos contadores do painel (Ameaças Detectadas vs Descarte de Kernel = 0 no Replay). Suíte de testes `tests/test_academic_replay.py` aprovada integralmente.
+- **Impacto:** Conformidade absoluta com o Quality Gate permanente do SPECTRE-GRID e garantia de integridade científica na apresentação do sistema para bancas e comitês de avaliação.
