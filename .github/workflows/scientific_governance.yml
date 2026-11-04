@@ -15,6 +15,8 @@ jobs:
   scientific-audit:
     name: Audit Scientific Integrity & Leakage Prevention
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
 
     steps:
       - name: Checkout code
@@ -33,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install torch_geometric
-          pip install pandas numpy scikit-learn pytest matplotlib
+          pip install pandas numpy scikit-learn pytest matplotlib seaborn
 
       - name: Run Scientific Governance Tests
         run: |

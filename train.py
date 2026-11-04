@@ -28,8 +28,11 @@ from typing import Dict, List, Optional, Tuple, Union
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+try:
+    import seaborn as sns
+except ImportError:
+    sns = None
 import numpy as np
-import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -134,14 +137,22 @@ def parse_args():
 def save_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, save_path: str) -> None:
     cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
     plt.figure(figsize=(6, 5))
-    sns.heatmap(
-        cm,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        xticklabels=["Normal (0)", "Ataque (1)"],
-        yticklabels=["Normal (0)", "Ataque (1)"],
-    )
+    if sns is not None:
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=["Normal (0)", "Ataque (1)"],
+            yticklabels=["Normal (0)", "Ataque (1)"],
+        )
+    else:
+        plt.imshow(cm, cmap="Blues")
+        for i in range(2):
+            for j in range(2):
+                plt.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
+        plt.xticks([0, 1], ["Normal (0)", "Ataque (1)"])
+        plt.yticks([0, 1], ["Normal (0)", "Ataque (1)"])
     plt.ylabel("Rótulo Verdadeiro")
     plt.xlabel("Previsão do Modelo")
     plt.title("Matriz de Confusão - Teste Reservado (Held-Out)")

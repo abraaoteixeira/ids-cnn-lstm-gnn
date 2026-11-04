@@ -135,7 +135,7 @@ Ambos os ambientes executaram o mesmo código da branch `fix/leakage-free-pipeli
 | `cnn_lstm_pure` (baseline temporal puro) | $0,7516 \pm 0,0070$ | $0,6488 \pm 0,0081$ | $0,8937 \pm 0,0134$ | $5,89\% \pm 0,24\%$ |
 | `gat_self_loop` (baseline topológico nulo) | $0,7463 \pm 0,0182$ | $0,6832 \pm 0,0108$ | $0,8245 \pm 0,0289$ | $6,29\% \pm 1,47\%$ |
 | `cnn_lstm_gat` (GNN direcionada $u \to v$) | $0,9337 \pm 0,0128$ | $0,8904 \pm 0,0242$ | $0,9825 \pm 0,0052$ | $1,52\% \pm 0,42\%$ |
-| `gat_reverse` (GNN invertida $v \to u$) | $0,9828 \pm 0,0107$ | $0,9766 \pm 0,0229$ | $0,9893 \pm 0,0061$ | $0,31\% \pm 0,27\%$ |
+| `gat_reverse` (GNN invertida $v \to u$) | $0,9006 \pm 0,1154$ | $0,8630 \pm 0,1613$ | $0,9514 \pm 0,0514$ | $2,21\% \pm 2,73\%$ |
 | **`gat_bidir` (GNN bidirecional)** | **$0,9618 \pm 0,0077$** | **$0,9426 \pm 0,0064$** | **$0,9817 \pm 0,0088$** | **$0,76\% \pm 0,11\%$** |
 | **`gat_residual` (GNN com conexão residual)** | **$0,9505 \pm 0,0070$** | **$0,9055 \pm 0,0124$** | **$1,0000 \pm 0,0000$** | **$1,25\% \pm 0,18\%$** |
 

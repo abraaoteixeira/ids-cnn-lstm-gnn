@@ -7,8 +7,14 @@ violação de causalidade em Snapshots Temporais G_t = (V_t, E_t) e uso de grafo
 em `preprocessor.py` e `train.py`.
 """
 
+import sys
 import tempfile
 from pathlib import Path
+
+# Garante que a raiz do repositório está no sys.path mesmo em ambientes CI
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
 import pandas as pd
