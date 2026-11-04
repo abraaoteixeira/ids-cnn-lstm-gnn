@@ -40,6 +40,15 @@ CMakeFiles/
 .DS_Store
 Thumbs.db
 
+# === LaTeX temporários ===
+paper/**/*.aux
+paper/**/*.bbl
+paper/**/*.blg
+paper/**/*.out
+
+# === Scratch / Temporários do Agente ===
+scratch/
+
 # === Releases empacotados ===
 *.zip
 

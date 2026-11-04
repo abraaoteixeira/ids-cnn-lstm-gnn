@@ -1,0 +1,17 @@
+# .cursorrules — SPECTRE-GRID Cursor & AI Assistant Directives
+
+# Supreme Constitution:
+# You MUST follow all 9 pillars defined in AGENTS.md and decisions in docs/SCIENTIFIC_MEMORY.md.
+# Principle: "Nenhuma afirmação científica sem evidência rastreável; nenhuma alteração crítica sem validação; nenhum resultado definitivo sem revisão independente."
+
+# Work Branch:
+# NEVER touch 'main' directly. All work belongs on 'fix/leakage-free-pipeline' or dedicated feature branches.
+
+# Anti-Leakage & Scientific Integrity Rules:
+1. NEVER fit StandardScaler, encoders, or Pearson correlations on test or validation splits. Only fit on train slice (rows 0..120,000 for UNSW-NB15_1).
+2. NEVER use random shuffle or k-fold CV. Use strict chronological sorting by Stime (mergesort).
+3. In graph snapshots G_t = (V_t, E_t), assign attack label 1 strictly to the source IP (src). Passive targets (dst) remain 0.
+4. When tuning models or evaluating architectures, ALWAYS use --val_only. The test split is a reserved holdout.
+5. In academic writing or reports, never fabricate metrics or citations. Provide exact pointers (dataset SHA-256, slice, seed, JSON report).
+6. Respect the 20 eBPF-compatible feature contract defined in preprocessor.py.
+7. Refer to .agents/skills/ for specialized operational procedures.

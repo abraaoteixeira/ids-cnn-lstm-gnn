@@ -1,0 +1,58 @@
+name: Scientific Governance & Anti-Leakage CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'fix/**'
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+      - 'fix/**'
+
+jobs:
+  scientific-audit:
+    name: Audit Scientific Integrity & Leakage Prevention
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install torch_geometric
+          pip install pandas numpy scikit-learn pytest matplotlib
+
+      - name: Run Scientific Governance Tests
+        run: |
+          pytest tests/test_scientific_governance.py -v
+
+      - name: Run Leakage-Free Pipeline Tests
+        run: |
+          pytest tests/test_leakage_free_pipeline.py -v
+
+      - name: Verify ADR and Skill Integrity
+        run: |
+          test -f AGENTS.md
+          test -f docs/SCIENTIFIC_MEMORY.md
+          test -f docs/CONTINUOUS_LEARNING_PROTOCOL.md
+          test -f .agents/skills/scientific-integrity/SKILL.md
+          test -f .agents/skills/dataset-leakage-audit/SKILL.md
+          test -f .agents/skills/reproducible-training/SKILL.md
+          test -f .agents/skills/ebpf-feature-parity/SKILL.md
+          test -f .agents/skills/model-evaluation/SKILL.md
+          test -f .agents/skills/ieee-paper-writing/SKILL.md
+          test -f .agents/skills/experiment-review/SKILL.md
+          echo "Scientific governance verification passed with 100% compliance."
