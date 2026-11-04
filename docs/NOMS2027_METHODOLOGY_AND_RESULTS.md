@@ -65,7 +65,7 @@ Em estrita consonância com a integridade metodológica:
   3. Primeira rodada exploratória na `seed=42` avaliando as variantes basais `cnn_lstm_pure`, `gat_self_loop` e `cnn_lstm_gat`.
 - Para sanar em definitivo qualquer risco de contaminação por vazamento de hipótese (*hypothesis snooping*), estabeleceu-se a seguinte estratégia de dupla blindagem científica:
   1. **Ablações e Seleção Arquitetural Restritas à Validação:** Todas as 18 baterias multi-seed da Fase 2 (`6 variantes × 3 seeds: 42, 123, 1337`) e as baterias da Modalidade B foram executadas sob `--val_only`, sem qualquer consulta ao teste;
-  2. **Validação Cega em Captura Independente com Ataques Reais (`UNSW-NB15_2.csv`):** Os modelos congelados foram submetidos a um teste verdadeiramente cego e independente na captura subsequente `UNSW-NB15_2.csv` (`linhas 400.000 .. 600.000`, `32.550` ataques reais, `226` snapshots temporais, `refitted_on_external = False`), apresentada na Seção 5.
+  2. **Avaliação Externa em Captura Independente com Ataques Reais (`UNSW-NB15_2.csv`):** Os modelos congelados foram avaliados sob mudança temporal de distribuição (*concept drift*) na captura subsequente `UNSW-NB15_2.csv` (`linhas 400.000 .. 600.000`, `32.550` ataques reais, `226` snapshots temporais, `refitted_on_external = False`), detalhada na Seção 5. Esse recorte foi selecionado após inspeção prévia da densidade de ataques para assegurar significância estatística, não devendo ser caracterizado como uma amostragem puramente cega, mas sim como um teste independente com normalizadores e parâmetros estritamente congelados.
 
 ---
 
@@ -158,7 +158,7 @@ Ambos os ambientes executaram o mesmo código da branch `fix/leakage-free-pipeli
 
 ## 5. Avaliação Independente em Captura Externa com Ataques Reais (`UNSW-NB15_2.csv`)
 
-Para comprovar a capacidade de generalização e detecção sob mudança temporal de distribuição (*temporal concept drift*), submetemos os checkpoints congelados da Fase 2 a uma avaliação cega em um recorte de **`200.000` registros de `UNSW-NB15_2.csv` (`linhas 400.000 .. 600.000`)**, contendo uma campanha ativa de ataques reais (`32.550` fluxos maliciosos, taxa de ataque de `16,28%`, abrangendo `7.837 segundos` / `2,18 horas`).
+Para comprovar a capacidade de generalização e detecção sob mudança temporal de distribuição (*temporal concept drift*), submetemos os checkpoints congelados da Fase 2 a uma avaliação independente em um recorte auditado de **`200.000` registros de `UNSW-NB15_2.csv` (`linhas 400.000 .. 600.000`)**, contendo uma campanha ativa de ataques reais (`32.550` fluxos maliciosos, taxa de ataque de `16,28%`, abrangendo `7.837 segundos` / `2,18 horas`). Conforme explicitado no protocolo científico, a escolha desse recorte baseou-se na auditoria da distribuição de rótulos ao longo da captura externa para assegurar presença suficiente de tráfego hostil, não devendo ser descrita como uma amostragem totalmente cega.
 
 ### 5.1. Protocolo de Isolamento (`refitted_on_external = False`)
 - **Vocabulário One-Hot e Features:** Exclusivamente as 20 features selecionadas por Pearson no treino de `UNSW-NB15_1`.
@@ -241,14 +241,22 @@ As Top-20 features selecionadas por Pearson no treino de `UNSW-NB15_1` (`unsw_fu
 | `cnn_lstm_gat` | $\text{F1} = 0,9337 \pm 0,0128$ ($\text{FPR} = 1,52\%$) | $\text{F1} = 0,8087 \text{ (s42)} / 0,6853 \text{ (s123)}$ ($\text{FPR} = 5,12\% / 7,06\%$) |
 | **`gat_residual`** | **$\text{F1} = 0,9505 \pm 0,0070$ ($\text{Rec} = 100\%, \text{FPR} = 1,25\%$)** | **$\text{F1} = 0,9343 \text{ (s42)} / 0,9143 \text{ (s123)}$ ($\text{Rec} = 100\%, \text{FPR} = 1,69\% / 2,25\%$)** |
 
+### 6.3. Diferenciação Epistemológica: Compatibilidade Conceitual, Sensor em Kernel e Benchmark Offline
+
+Para assegurar rigor científico e integridade metodológica absoluta, o projeto diferencia formalmente três níveis operacionais:
+1. **Nível 1 — Compatibilidade Teórica / Conceitual:** Refere-se a atributos L3/L4 cuja extração matemática prescinde de inspeção de payload de aplicação (DPI) em L7.
+2. **Nível 2 — Implementação Efetiva no Sensor Kernel (`spectre_xdp.c` + `loader_fusion_v2.cpp`):** O driver C/XDP de alta velocidade extrai unicamente métricas unidirecionais de ingresso por pacote (`sttl`, `dsport`, `swin`, contadores agregados locais de bytes/pacotes). O sensor no kernel *não* armazena tabelas rolantes históricas de 100 conexões (`ct_*`) nem reconstrói fluxos reversos de saída (`dttl`, `dwin`), funções que dependem de daemons de estado em userspace.
+3. **Nível 3 — Benchmark Offline (Modalidade A vs. Modalidade B):** Avaliação de modelos neurais sobre datasets estáticos sob o escopo `ebpf_compatible` (Modalidade A, 20 features) e sob o escopo estrito `ebpf_sensor_strict` (Modalidade B, contadores unidirecionais derivados).
+4. **Separação de Escopo de Desempenho e Latência:** As medições de latência registradas ($3,83\text{ ms}$ a $6,57\text{ ms}$ por snapshot de 30 segundos) avaliam a prontidão computacional do pipeline neural local (extração de grafo + transferência + inferência em GPU de consumo). **Não foi conduzido ensaio operacional de mitigação in-line ativo em enlace físico de 10 GbE com descarte efetivo de pacotes**, permanecendo a mitigação em tempo de rede como trabalho futuro de engenharia.
+
 ---
 
 ## 7. Parecer de Prontidão Científica para o Manuscrito IEEE/IFIP NOMS 2027
 
 Com a conclusão da auditoria de consistência, conciliação formal da amostragem temporal e validação cruzada entre o Dell G15 e o Google Colab Pro, conclui-se o seguinte parecer:
 
-1. **Estado Metodológico:** Aprovado e blindado contra vazamento causal (*leakage-free*). O horizonte ativo de 200.000 registros, a validação de estabilidade na cauda de 500.001 registros benignos e a avaliação cega em `UNSW-NB15_2.csv` estão formalmente documentados com hashes SHA-256 e sem qualquer sobreposição;
+1. **Estado Metodológico:** Aprovado e blindado contra vazamento causal (*leakage-free*). O horizonte ativo de 200.000 registros, a validação de estabilidade na cauda de 500.001 registros benignos e a avaliação externa sob concept drift em `UNSW-NB15_2.csv` (recorte auditado de 200k linhas) estão formalmente documentados com hashes SHA-256 e sem qualquer sobreposição temporal;
 2. **Reprodutibilidade Cruzada:** Comprovada entre arquiteturas de GPU distintas (RTX 3050 e Tesla T4). A hierarquia de desempenho é matematicamente invariante;
 3. **Robustez a Concept Drift Comprovada:** A avaliação em `UNSW-NB15_2.csv` comprovou que a camada de atenção em grafo (GAT) oferece ganhos substanciais de transferência de domínio (+20 pontos percentuais de F1 e redução de 65% nos falsos positivos frente a modelos sem grafo);
-4. **Viabilidade no Kernel:** A Modalidade B demonstra que o sensor eBPF/XDP de ingresso, operando em conjunto com a variante `gat_residual`, sustenta F1 > 0,91 com 100% de Recall na detecção de ataques em tempo real.
-5. **Decisão:** **PRONTO PARA SUBMISSÃO / INCORPORAÇÃO AO TEXTO PRINCIPAL DO ARTIGO.**
+4. **Viabilidade Computacional e Escopo no Kernel:** Os ensaios offline da Modalidade B comprovam que contadores estritamente unidirecionais factíveis no XDP sustentam F1 > 0,91 com 100% de Recall na variante residual. A latência de inferência local (< 7 ms por snapshot de 30 s) atesta a viabilidade algorítmica para operação contínua sem acúmulo de filas, ressalvando-se que ensaios de mitigação ativa in-line em enlace físico ao vivo constituem trabalho futuro;
+5. **Decisão:** **PRONTO PARA REVISÃO FINAL PELO ORIENTADOR (PROF. DR. JACKSON MALLMANN) E POSTERIOR SUBMISSÃO.**
