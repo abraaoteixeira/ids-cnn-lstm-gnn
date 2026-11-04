@@ -50,12 +50,12 @@ Este documento registra formalmente as decisões de projeto, metodologia cientí
 ---
 
 ### ADR-004: Horizonte Ativo de 200k Registros e Auditoria da Cauda Benigna
-- **Data:** 2026-10-28
+- **Data:** 2026-10-28 (Atualizada em 2026-11-04 com auditoria cronológica)
 - **Status:** VIGENTE
-- **Contexto:** O primeiro arquivo do UNSW-NB15 (`UNSW-NB15_1.csv`, 700.001 registros) apresenta uma distribuição bimodal anômala: as primeiras 200.000 linhas contêm 25.176 ataques multivariados (Scans, Exploits, DoS, Fuzzers) distribuídos ao longo de horas; as 500.001 linhas subsequentes são 100% tráfego benigno sintético (sem nenhum ataque). Avaliar o dataset completo agregando métricas mascara o desempenho em ataques e produz métricas de recall ilusórias.
-- **Decisão:** Adotar as primeiras **200.000 linhas** como o **Horizonte Ativo** para treinamento, validação e teste sob presença de ataques, gerando 152 snapshots de treino, 48 de validação e 56 de teste. Utilizar as 500.001 linhas restantes (a "cauda benigna") exclusivamente como um **teste de robustez operacional e estresse de FPR**, nunca como métrica de capacidade de generalização de ataques.
-- **Evidência:** Nos 1.488 snapshots da cauda benigna, foram auditados 0 ataques reais. Modelos que operavam nessa faixa sem monitoramento de FPR apresentavam falsos alarmes cumulativos inaceitáveis.
-- **Impacto:** Transparência total na metodologia do artigo NOMS 2027, justificando o particionamento temporal com rigor inquestionável.
+- **Contexto:** O primeiro arquivo do UNSW-NB15 (`UNSW-NB15_1.csv`, 700.001 registros) apresenta uma distribuição bimodal anômala: as primeiras 200.000 linhas concentram todos os 22.215 ataques multivariados da captura (Scans, Exploits, DoS, Fuzzers, ocorrendo estritamente entre as linhas 13 e 186.807) — anotações exploratórias preliminares estimavam 25.176 ataques antes da auditoria estrita por ordenação cronológica e hash SHA-256 (`g15_dataset_chronology_audit.json`); as 500.001 linhas subsequentes são 100% tráfego benigno sintético (sem nenhum ataque). Avaliar o dataset completo agregando métricas mascara o desempenho em ataques e produz métricas de recall ilusórias.
+- **Decisão:** Adotar as primeiras **200.000 linhas** como o **Horizonte Ativo** para treinamento, validação e teste sob presença de ataques, gerando 152 snapshots de treino, 48 de validação e 56 de teste ($\Delta t = 30\text{ s}$). Utilizar as 500.001 linhas restantes (a "cauda benigna") exclusivamente como um **teste de robustez operacional e estresse de FPR**, nunca como métrica de capacidade de generalização de ataques.
+- **Evidência:** Nos 667 snapshots da cauda benigna ($\Delta t = 30\text{ s}$, 15.900 nós benignos, previamente anotados como 1.488 em estimativas sem discretização canônica), foram auditados rigorosamente 0 ataques reais (`g15_external_tail500k_fpr_report.json`). Modelos avaliados nessa faixa sem monitoramento de FPR apresentavam falsos alarmes cumulativos inaceitáveis.
+- **Impacto:** Transparência total na metodologia do artigo NOMS 2027, justificando o particionamento temporal com rigor inquestionável e reconciliando o registro histórico de contagem.
 
 ---
 
