@@ -10,6 +10,10 @@ a rejeição controlada de tentativas de violação de holdout.
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 REQUIRED_FILES = [
     "AGENTS.md",
     "CLAUDE.md",
@@ -18,6 +22,8 @@ REQUIRED_FILES = [
     "docs/CONTINUOUS_LEARNING_PROTOCOL.md",
     ".github/workflows/scientific_governance.yml",
     "tests/test_scientific_governance.py",
+    "tests/test_metrics_consistency.py",
+    "tools/verify_metrics_consistency.py",
 ]
 
 REQUIRED_SKILLS = [
@@ -97,6 +103,14 @@ def audit_holdout_protection_simulation():
         print(f"  [OK] Bloqueio preventivo atuou com sucesso: {e}")
 
 
+def audit_metrics_consistency():
+    print("\n[5/5] Auditando conciliação estrita de métricas e rastreabilidade JSON...")
+    import tools.verify_metrics_consistency as vmc
+    res = vmc.main()
+    if res != 0:
+        raise RuntimeError("FALHA: Divergência na auditoria de conciliação métrica!")
+
+
 def main():
     print("=" * 70)
     print("SPECTRE-GRID — AUDITORIA DE GOVERNANÇA PERMANENTE E INTEGRIDADE CIENTÍFICA")
@@ -105,6 +119,7 @@ def main():
     audit_skills()
     audit_adrs()
     audit_holdout_protection_simulation()
+    audit_metrics_consistency()
     print("\n" + "=" * 70)
     print("TODOS OS TESTES DE GOVERNANÇA FORAM APROVADOS COM SUCESSO (100% COMPLIANCE)")
     print("=" * 70)

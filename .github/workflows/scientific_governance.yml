@@ -41,12 +41,18 @@ jobs:
         run: |
           pytest tests/test_scientific_governance.py -v
 
+      - name: Run Metric Consistency & Traceability Audit
+        run: |
+          python tools/verify_metrics_consistency.py
+          pytest tests/test_metrics_consistency.py -v
+
       - name: Run Leakage-Free Pipeline Tests
         run: |
           pytest tests/test_leakage_free_pipeline.py -v
 
-      - name: Verify ADR and Skill Integrity
+      - name: Verify ADR, Skill, and Governance Persistence Integrity
         run: |
+          python tools/verify_governance_persistence.py
           test -f AGENTS.md
           test -f docs/SCIENTIFIC_MEMORY.md
           test -f docs/CONTINUOUS_LEARNING_PROTOCOL.md
